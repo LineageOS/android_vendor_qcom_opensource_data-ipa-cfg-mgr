@@ -1201,6 +1201,9 @@ int IPACM_Wan::handle_route_add_evt(ipa_ip_type iptype)
 	{
 		IPACM_Wan::wan_up_v6 = true;
 		active_v6 = true;
+		memcpy(IPACM_Wan::wan_up_dev_name,
+			dev_name,
+				sizeof(IPACM_Wan::wan_up_dev_name));
 
 		if(m_is_sta_mode == Q6_WAN)
 		{
@@ -3433,7 +3436,14 @@ int IPACM_Wan::handle_route_del_evt(ipa_ip_type iptype)
 			IPACMDBG_H("setup wan_up/active_v4= false \n");
 			IPACM_Wan::wan_up = false;
 			active_v4 = false;
-			memset(IPACM_Wan::wan_up_dev_name, 0, sizeof(IPACM_Wan::wan_up_dev_name));
+			if(IPACM_Wan::wan_up_v6)
+			{
+				IPACMDBG_H("modem v6-call still up(%s), not reset\n", IPACM_Wan::wan_up_dev_name);
+			}
+			else
+			{
+				memset(IPACM_Wan::wan_up_dev_name, 0, sizeof(IPACM_Wan::wan_up_dev_name));
+			}
 		}
 		else
 		{
@@ -3454,6 +3464,14 @@ int IPACM_Wan::handle_route_del_evt(ipa_ip_type iptype)
 			IPACMDBG_H("setup wan_up_v6/active_v6= false \n");
 			IPACM_Wan::wan_up_v6 = false;
 			active_v6 = false;
+			if(IPACM_Wan::wan_up)
+			{
+				IPACMDBG_H("modem v4-call still up(%s), not reset\n", IPACM_Wan::wan_up_dev_name);
+			}
+			else
+			{
+				memset(IPACM_Wan::wan_up_dev_name, 0, sizeof(IPACM_Wan::wan_up_dev_name));
+			}
 		}
 	}
 	else
@@ -3528,7 +3546,14 @@ int IPACM_Wan::handle_route_del_evt_ex(ipa_ip_type iptype)
 			IPACMDBG_H("setup wan_up/active_v4= false \n");
 			IPACM_Wan::wan_up = false;
 			active_v4 = false;
-			memset(IPACM_Wan::wan_up_dev_name, 0, sizeof(IPACM_Wan::wan_up_dev_name));
+			if(IPACM_Wan::wan_up_v6)
+			{
+				IPACMDBG_H("modem v6-call still up(%s), not reset\n", IPACM_Wan::wan_up_dev_name);
+			}
+			else
+			{
+				memset(IPACM_Wan::wan_up_dev_name, 0, sizeof(IPACM_Wan::wan_up_dev_name));
+			}
 		}
 		else
 		{
@@ -3549,6 +3574,14 @@ int IPACM_Wan::handle_route_del_evt_ex(ipa_ip_type iptype)
 			IPACMDBG_H("setup wan_up_v6/active_v6= false \n");
 			IPACM_Wan::wan_up_v6 = false;
 			active_v6 = false;
+			if(IPACM_Wan::wan_up)
+			{
+				IPACMDBG_H("modem v4-call still up(%s), not reset\n", IPACM_Wan::wan_up_dev_name);
+			}
+			else
+			{
+				memset(IPACM_Wan::wan_up_dev_name, 0, sizeof(IPACM_Wan::wan_up_dev_name));
+			}
 		}
 	}
 	else
@@ -3945,7 +3978,14 @@ int IPACM_Wan::handle_down_evt_ex()
 			del_wan_firewall_rule(IPA_IP_v4);
 			install_wan_filtering_rule(false);
 			handle_route_del_evt_ex(IPA_IP_v4);
-			memset(IPACM_Wan::wan_up_dev_name, 0, sizeof(IPACM_Wan::wan_up_dev_name));
+			if(IPACM_Wan::wan_up_v6)
+			{
+				IPACMDBG_H("modem v6-call still up(%s), not reset\n", IPACM_Wan::wan_up_dev_name);
+			}
+			else
+			{
+				memset(IPACM_Wan::wan_up_dev_name, 0, sizeof(IPACM_Wan::wan_up_dev_name));
+			}
 		}
 
 		/* only when the last ipv4 modem interface goes down, delete ipv4 default flt rules*/
@@ -3971,10 +4011,18 @@ int IPACM_Wan::handle_down_evt_ex()
 		/* only when default gw goes down we post WAN_DOWN event*/
 		if(is_default_gateway == true)
 		{
-		IPACM_Wan::wan_up_v6 = false;
+			IPACM_Wan::wan_up_v6 = false;
 			del_wan_firewall_rule(IPA_IP_v6);
 			install_wan_filtering_rule(false);
 			handle_route_del_evt_ex(IPA_IP_v6);
+			if(IPACM_Wan::wan_up)
+			{
+				IPACMDBG_H("modem v4-call still up(%s), not reset\n", IPACM_Wan::wan_up_dev_name);
+			}
+			else
+			{
+				memset(IPACM_Wan::wan_up_dev_name, 0, sizeof(IPACM_Wan::wan_up_dev_name));
+			}
 		}
 
 		/* only when the last ipv6 modem interface goes down, delete ipv6 default flt rules*/
@@ -4008,11 +4056,11 @@ int IPACM_Wan::handle_down_evt_ex()
 			IPACM_Wan::wan_up = false;
 			del_wan_firewall_rule(IPA_IP_v4);
 			handle_route_del_evt_ex(IPA_IP_v4);
-			memset(IPACM_Wan::wan_up_dev_name, 0, sizeof(IPACM_Wan::wan_up_dev_name));
 
 			IPACM_Wan::wan_up_v6 = false;
 			del_wan_firewall_rule(IPA_IP_v6);
 			handle_route_del_evt_ex(IPA_IP_v6);
+			memset(IPACM_Wan::wan_up_dev_name, 0, sizeof(IPACM_Wan::wan_up_dev_name));
 
 			install_wan_filtering_rule(false);
 		}

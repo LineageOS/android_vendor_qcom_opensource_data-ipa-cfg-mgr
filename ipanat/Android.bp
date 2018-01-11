@@ -19,7 +19,6 @@ cc_library_shared {
     export_include_dirs: ["inc"],
     vendor: true,
     cflags: [
-        "-DDEBUG",
         "-Wall",
         "-Werror",
     ] + ["-DFEATURE_IPA_ANDROID"],

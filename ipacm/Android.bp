@@ -7,7 +7,6 @@ cc_binary {
 
     cflags: ["-DFEATURE_IPA_ANDROID"] + ["-DFEATURE_IPACM_RESTART"] + [
         "-DFEATURE_IPACM_AIDL",
-	"-DDEBUG",
         "-Wall",
         "-Werror",
         "-Wno-error=macro-redefined",
@@ -87,7 +86,6 @@ cc_fuzz {
 
     cflags: ["-v"] + ["-DFEATURE_IPA_ANDROID"] + ["-DFEATURE_IPACM_RESTART"] + [
         "-DFEATURE_IPACM_AIDL",
-	    "-DDEBUG",
         "-Wall",
         "-Werror",
         "-Wno-error=macro-redefined",

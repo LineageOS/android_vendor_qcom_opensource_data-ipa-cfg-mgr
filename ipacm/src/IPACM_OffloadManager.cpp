@@ -135,7 +135,7 @@ RET IPACM_OffloadManager::provideFd(int fd, unsigned int groups)
 	/* check socket name */
 	memset(&local, 0, sizeof(struct sockaddr_nl));
 	addr_len = sizeof(local);
-	getsockname(fd, (struct sockaddr *)&local, &addr_len);
+	getsockname(fd, (struct sockaddr *)&local, (socklen_t *)&addr_len);
 	IPACMDBG_H(" FD %d, nl_pad %d nl_pid %u\n", fd, local.nl_pad, local.nl_pid);
 
 	/* add the check if getting FDs already or not */
@@ -594,7 +594,7 @@ RET IPACM_OffloadManager::setQuota(const char * upstream_name /* upstream */, ui
 		return FAIL_INPUT_CHECK;
 	}
 
-	IPACMDBG_H("SET_DATA_QUOTA %s %lu", quota.interface_name, mb);
+	IPACMDBG_H("SET_DATA_QUOTA %s %llu", quota.interface_name, (long long)mb);
 
 	rc = ioctl(fd, WAN_IOC_SET_DATA_QUOTA, &quota);
 
@@ -644,7 +644,7 @@ RET IPACM_OffloadManager::getStats(const char * upstream_name /* upstream */,
 	offload_stats.tx = stats.tx_bytes;
 	offload_stats.rx = stats.rx_bytes;
 
-	IPACMDBG_H("send getStats tx:%lu rx:%lu \n", offload_stats.tx, offload_stats.rx);
+	IPACMDBG_H("send getStats tx:%llu rx:%llu \n", (long long)offload_stats.tx, (long long)offload_stats.rx);
 	close(fd);
 	return SUCCESS;
 }
@@ -803,7 +803,7 @@ bool IPACM_OffloadManager::search_framwork_cache(char * interface_name)
 int IPACM_OffloadManager::push_iface_up(const char * if_name, bool upstream)
 {
 	ipacm_cmd_q_data evt_data;
-	ipacm_event_data_fid *data_fid;
+	ipacm_event_data_fid *data_fid = NULL;
 	ipacm_event_data_mac *data = NULL;
 	int index;
 
@@ -876,7 +876,7 @@ int IPACM_OffloadManager::push_iface_up(const char * if_name, bool upstream)
 		evt_data.event = IPA_WLAN_STA_LINK_UP_EVENT;
 		evt_data.evt_data = data;
 		IPACMDBG_H("Posting IPA_WLAN_STA_LINK_UP_EVENT with if index: %d\n",
-			data_fid->if_index);
+			data->if_index);
 		IPACM_EvtDispatcher::PostEvt(&evt_data);
 	}
 

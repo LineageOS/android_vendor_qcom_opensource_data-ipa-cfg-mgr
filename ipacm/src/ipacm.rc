@@ -30,5 +30,8 @@ service vendor.ipacm /system/vendor/bin/ipacm
     user radio
     group radio inet
 
+# msm specific files that need to be created on /data
 on post-fs-data
+    mkdir /data/vendor/ipa 0770 radio radio
+    chmod 0770 /data/vendor/ipa
     start vendor.ipacm

@@ -26,9 +26,11 @@
 # IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 service vendor.ipacm /system/vendor/bin/ipacm
-    class main
+    class late_start
     user radio
     group radio inet
 
+# msm specific files that need to be created on /data
 on post-fs-data
-    start vendor.ipacm
+    mkdir /data/vendor/ipa 0770 radio radio
+    chmod 0770 /data/vendor/ipa

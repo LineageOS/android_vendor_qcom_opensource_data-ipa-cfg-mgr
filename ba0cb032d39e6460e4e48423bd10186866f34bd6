@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "04d410cb_dc53286a",
+        "filename": "ipacm/src/ipacm.rc",
+        "patchSetId": 1
+      },
+      "lineNbr": 30,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2019-11-18T09:20:20Z",
+      "side": 1,
+      "message": "Spaces",
+      "range": {
+        "startLine": 30,
+        "startChar": 0,
+        "endLine": 30,
+        "endChar": 1
+      },
+      "revId": "ba0cb032d39e6460e4e48423bd10186866f34bd6",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}

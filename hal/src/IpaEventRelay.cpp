@@ -28,7 +28,7 @@
  */
 #define LOG_TAG "IPAHALService/IpaEventRelay"
 /* External Includes */
-#include <cutils/log.h>
+#include <log/log.h>
 //#include <hidl/Status.h> //TODO: Might be easier to return Status
 
 /* HIDL Includes */

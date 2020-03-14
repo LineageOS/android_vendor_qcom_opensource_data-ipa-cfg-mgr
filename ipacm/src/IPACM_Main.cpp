@@ -951,11 +951,11 @@ int main(int argc, char **argv)
 	IPACMDBG_H(" START IPACM_OffloadManager and link to android framework\n");
 #endif
 
-#ifdef FEATURE_ETH_BRIDGE_LE
-	IPACM_LanToLan* lan2lan = IPACM_LanToLan::get_instance();
-	IPACMDBG_H("Staring IPACM_LanToLan instance %p\n", lan2lan);
-#endif
-
+	if (IPACM_Iface::ipacmcfg->isEthBridgingSupported())
+	{
+		IPACM_LanToLan* lan2lan = IPACM_LanToLan::get_instance();
+		IPACMDBG_H("Staring IPACM_LanToLan instance %p\n", lan2lan);
+	}
 	CtList = new IPACM_ConntrackListener();
 
 	IPACMDBG_H("Staring IPA main\n");

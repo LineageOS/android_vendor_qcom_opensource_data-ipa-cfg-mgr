@@ -546,9 +546,8 @@ int NatApp::AddConnection(const nat_table_entry *rule)
 	flt_rule_entry.rule.to_uc = 0;
 	flt_rule_entry.rule.eq_attrib_type = 1;
 	flt_rule_entry.rule.action = IPA_PASS_TO_ROUTING;
-#ifdef FEATURE_IPA_V3
-	flt_rule_entry.rule.hashable = true;
-#endif
+	if (IPACM_Iface::ipacmcfg->isIPAv3Supported())
+		flt_rule_entry.rule.hashable = true;
 	flt_rule_entry.rule.attrib.attrib_mask |= IPA_FLT_SRC_PORT;
 	flt_rule_entry.rule.attrib.src_port = rule->target_port;
 	flt_rule_entry.rule.attrib.attrib_mask |= IPA_FLT_DST_PORT;

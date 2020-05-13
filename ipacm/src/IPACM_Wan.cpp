@@ -7342,10 +7342,10 @@ fail:
 			rt_rule_entry = &rt_rule->rules[0];
 			rt_rule_entry->at_rear = false;
 			rt_rule_entry->rule.attrib.attrib_mask = IPA_FLT_DST_ADDR;
-			rt_rule_entry->rule.attrib.u.v6.dst_addr[0] = ipv6_addr[num_dft_rt_v6][0];
-			rt_rule_entry->rule.attrib.u.v6.dst_addr[1] = ipv6_addr[num_dft_rt_v6][1];
-			rt_rule_entry->rule.attrib.u.v6.dst_addr[2] = ipv6_addr[num_dft_rt_v6][2];
-			rt_rule_entry->rule.attrib.u.v6.dst_addr[3] = ipv6_addr[num_dft_rt_v6][3];
+			rt_rule_entry->rule.attrib.u.v6.dst_addr[0] = ipv6_addr[i][0];
+			rt_rule_entry->rule.attrib.u.v6.dst_addr[1] = ipv6_addr[i][1];
+			rt_rule_entry->rule.attrib.u.v6.dst_addr[2] = ipv6_addr[i][2];
+			rt_rule_entry->rule.attrib.u.v6.dst_addr[3] = ipv6_addr[i][3];
 			rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[0] = 0xFFFFFFFF;
 			rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[1] = 0xFFFFFFFF;
 			rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[2] = 0xFFFFFFFF;

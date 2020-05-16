@@ -7,6 +7,7 @@ cc_binary {
 
     cflags: ["-v"] + ["-DFEATURE_IPA_ANDROID"] + ["-DFEATURE_IPACM_RESTART"] + [
         "-DFEATURE_IPACM_HAL",
+	"-DDEBUG",
         "-Wall",
         "-Werror",
         "-Wno-error=macro-redefined",

@@ -760,10 +760,19 @@ void* ipa_driver_msg_notifier(void *param)
 				IPACMERR("calling OffloadMng->elrInstance->onOffloadStopped \n");
 				OffloadMng->elrInstance->onOffloadStopped(IpaEventRelay::ERROR);
 			}
-			/* WA to clean up wlan instances during SSR */
-			evt_data.event = IPA_SSR_NOTICE;
-			evt_data.evt_data = NULL;
-			break;
+			/* Starting from Hastings, WLAN is not restarted as part of Modem SSR.
+			 * No need to reset NAT Iface.
+			 */
+#ifdef IPA_HW_v4_9
+                        if (IPACM_Iface::ipacmcfg->GetIPAVer() != IPA_HW_v4_9)
+#endif
+			{
+                                /* WA to clean up wlan instances during SSR */
+                                evt_data.event = IPA_SSR_NOTICE;
+                                evt_data.evt_data = NULL;
+                                break;
+                        }
+                        continue;
 		case IPA_SSR_AFTER_POWERUP:
 			IPACMDBG_H("Received IPA_SSR_AFTER_POWERUP\n");
 			OffloadMng = IPACM_OffloadManager::GetInstance();

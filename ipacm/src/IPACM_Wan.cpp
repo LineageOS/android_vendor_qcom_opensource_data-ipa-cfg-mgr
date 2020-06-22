@@ -2236,6 +2236,9 @@ int IPACM_Wan::handle_route_add_evt(ipa_ip_type iptype)
 				}
 				IPACMDBG_H("send WAN_IOC_NOTIFY_WAN_STATE up to IPA_PM\n");
 				wan_state.up = true;
+#ifdef WAN_IOCTL_NOTIFY_WAN_INTF_NAME
+				strlcpy(wan_state.upstreamIface, dev_name, IFNAMSIZ);
+#endif
 				if(ioctl(fd_wwan_ioctl, WAN_IOC_NOTIFY_WAN_STATE, &wan_state))
 				{
 					IPACMERR("Failed to send WAN_IOC_NOTIFY_WAN_STATE as up %d\n ", wan_state.up);
@@ -4814,6 +4817,9 @@ int IPACM_Wan::handle_route_del_evt(ipa_ip_type iptype)
 					return false;
 				}
 				IPACMDBG_H("send WAN_IOC_NOTIFY_WAN_STATE down to IPA_PM\n");
+#ifdef WAN_IOCTL_NOTIFY_WAN_INTF_NAME
+                                strlcpy(wan_state.upstreamIface, dev_name, IFNAMSIZ);
+#endif
 				if(ioctl(fd_wwan_ioctl, WAN_IOC_NOTIFY_WAN_STATE, &wan_state))
 				{
 					IPACMERR("Failed to send WAN_IOC_NOTIFY_WAN_STATE as up %d\n ", wan_state.up);
@@ -4995,6 +5001,9 @@ int IPACM_Wan::handle_route_del_evt_ex(ipa_ip_type iptype)
 					return false;
 				}
 				IPACMDBG_H("send WAN_IOC_NOTIFY_WAN_STATE down to IPA_PM\n");
+#ifdef WAN_IOCTL_NOTIFY_WAN_INTF_NAME
+                                strlcpy(wan_state.upstreamIface, dev_name, IFNAMSIZ);
+#endif
 				if(ioctl(fd_wwan_ioctl, WAN_IOC_NOTIFY_WAN_STATE, &wan_state))
 				{
 					IPACMERR("Failed to send WAN_IOC_NOTIFY_WAN_STATE as up %d\n ", wan_state.up);

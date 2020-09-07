@@ -121,7 +121,7 @@ int ipa_reset_hw_index_counter();
 
 #ifdef FEATURE_IPACM_HAL
 	IPACM_OffloadManager* OffloadMng;
-	HAL *hal;
+	::android::sp<HAL> hal;
 #endif
 
 /* start netlink socket monitor*/

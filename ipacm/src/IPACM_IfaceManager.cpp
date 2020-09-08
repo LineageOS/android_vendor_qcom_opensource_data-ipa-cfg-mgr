@@ -450,6 +450,12 @@ int IPACM_IfaceManager::create_iface_instance(ipacm_ifacemgr_data *param)
 					else
 					{
 						w = new IPACM_Wan(ipa_interface_index, is_sta_mode, NULL);
+						if (w->rx_prop == NULL && w->tx_prop == NULL)
+						{
+							/* close the netdev instance if IPA not support*/
+							w->delete_iface();
+							return IPACM_FAILURE;
+						}
 					}
 					IPACM_EvtDispatcher::registr(IPA_ADDR_ADD_EVENT, w);
 #ifdef FEATURE_IPA_ANDROID

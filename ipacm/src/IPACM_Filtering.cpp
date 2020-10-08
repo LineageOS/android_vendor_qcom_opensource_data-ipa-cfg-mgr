@@ -1006,17 +1006,18 @@ bool IPACM_Filtering::ModifyFilteringRule(struct ipa_ioc_mdfy_flt_rule* ruleTabl
 	}
 
 	ret = ioctl(fd, IPA_IOC_MDFY_FLT_RULE, ruleTable);
+
+	for (i = 0; i < ruleTable->num_rules; i++)
+	{
+		if (ruleTable->rules[i].status != 0)
+		{
+			IPACMERR("Modifying filter rule %d failed\n", i);
+		}
+	}
+
 	if (ret != 0)
 	{
-		IPACMERR("Failed modifying filtering rule %pK\n", ruleTable);
-
-		for (i = 0; i < ruleTable->num_rules; i++)
-		{
-			if (ruleTable->rules[i].status != 0)
-			{
-				IPACMERR("Modifying filter rule %d failed\n", i);
-			}
-		}
+		IPACMERR("Failed modifying filtering rule IOCTL for %pK\n", ruleTable);
 		return false;
 	}
 

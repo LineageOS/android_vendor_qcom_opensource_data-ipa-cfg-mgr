@@ -4179,7 +4179,9 @@ int IPACM_Lan::handle_private_subnet_android(ipa_ip_type iptype)
 	struct ipa_ioc_mdfy_flt_rule* pFilteringTable;
 	int mtu_rule_cnt = 0;
 	uint16_t mtu[IPA_MAX_PRIVATE_SUBNET_ENTRIES + IPA_MAX_MTU_ENTRIES] = { };
+#ifndef NO_MTU
 	int mtu_rule_idx = IPACM_Iface::ipacmcfg->ipa_num_private_subnet;
+#endif
 
 	if (rx_prop == NULL)
 	{
@@ -4255,6 +4257,7 @@ int IPACM_Lan::handle_private_subnet_android(ipa_ip_type iptype)
 			memcpy(&(pFilteringTable->rules[i]), &flt_rule, sizeof(struct ipa_flt_rule_mdfy));
 			IPACMDBG_H(" IPACM private subnet_addr as: 0x%x entry(%d)\n", flt_rule.rule.attrib.u.v4.dst_addr, i);
 
+#ifndef NO_MTU
 			/* add corresponding MTU rule for ipv4 */
 			if (mtu[i] > 0)
 			{
@@ -4268,6 +4271,7 @@ int IPACM_Lan::handle_private_subnet_android(ipa_ip_type iptype)
 				memcpy(&(pFilteringTable->rules[mtu_rule_idx + i]), &flt_rule, sizeof(struct ipa_flt_rule_mdfy));
 				IPACMDBG_H("Adding MTU rule for private subnet 0x%x.\n", flt_rule.rule.attrib.u.v4.src_addr);
 			}
+#endif
 		}
 
 		if (false == m_filtering.ModifyFilteringRule(pFilteringTable))
@@ -4344,6 +4348,7 @@ int IPACM_Lan::install_ipv6_prefix_flt_rule(uint32_t* prefix)
 		flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[3] = 0x0;
 		memcpy(&(flt_rule->rules[0]), &flt_rule_entry, sizeof(struct ipa_flt_rule_add));
 
+#ifndef NO_MTU
 		memcpy(&flt_rule_entry.rule.attrib, &rx_prop->rx[0].attrib, sizeof(flt_rule_entry.rule.attrib)); // this will remove the IPA_FLT_DST_ADDR
 		flt_rule_entry.rule.attrib.u.v6.src_addr[3] = prefix[0];
 		flt_rule_entry.rule.attrib.u.v6.src_addr[2] = prefix[1];
@@ -4367,6 +4372,7 @@ int IPACM_Lan::install_ipv6_prefix_flt_rule(uint32_t* prefix)
 				memcpy(&(flt_rule->rules[1]), &flt_rule_entry, sizeof(struct ipa_flt_rule_add));
 			}
 		}
+#endif
 
 #ifdef IPA_IOCTL_SET_FNR_COUNTER_INFO
 		/* use index hw-counter */

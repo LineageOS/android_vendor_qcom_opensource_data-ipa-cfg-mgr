@@ -1,5 +1,6 @@
 
 cc_binary {
+    defaults: ["ipacm_no_mtu_defaults"],
     name: "ipacm",
 
     local_include_dirs: ["src"] + ["inc"],

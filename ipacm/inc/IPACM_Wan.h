@@ -105,8 +105,6 @@ public:
 	static bool wan_up;
 	static bool wan_up_v6;
 	static uint8_t xlat_mux_id;
-	static uint16_t mtu_default_wan;
-	uint16_t mtu_size;
 	/* IPACM interface name */
 	static char wan_up_dev_name[IF_NAME_LEN];
 	static uint32_t curr_wan_ip;
@@ -137,26 +135,6 @@ public:
 #else
 		return wan_up;
 #endif
-	}
-
-	static uint16_t queryMTU(int ipa_if_num_tether, enum ipa_ip_type iptype)
-	{
-		if (iptype == IPA_IP_v4)
-		{
-			if (isWanUP(ipa_if_num_tether))
-			{
-				return mtu_default_wan;
-			}
-		}
-		else if (iptype == IPA_IP_v6)
-		{
-			if (isWanUP_V6(ipa_if_num_tether))
-			{
-				return mtu_default_wan;
-
-			}
-		}
-		return DEFAULT_MTU_SIZE;
 	}
 
 	static bool isWanUP_V6(int ipa_if_num_tether)
@@ -673,9 +651,6 @@ private:
 	int add_tcp_fin_rst_exception_rule();
 
 	int delete_tcp_fin_rst_exception_rule();
-
-	/* Query mtu size */
-	int query_mtu_size();
 };
 
 #endif /* IPACM_WAN_H */

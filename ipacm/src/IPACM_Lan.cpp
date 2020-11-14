@@ -751,25 +751,7 @@ void IPACM_Lan::event_callback(ipa_cm_event_id event, void *param)
 		if (ipa_interface_index == ipa_if_num)
 		{
 			IPACMDBG_H("Received IPA_DOWNSTREAM_ADD event.\n");
-#ifdef FEATURE_IPA_ANDROID
-			if (IPACM_Wan::isXlat() && (data->prefix.iptype == IPA_IP_v4))
-			{
-				/* indicate v4-offload */
-				IPACM_OffloadManager::num_offload_v4_tethered_iface++;
-				IPACMDBG_H("in xlat: update num_offload_v4_tethered_iface %d\n", IPACM_OffloadManager::num_offload_v4_tethered_iface);
 
-				/* xlat not support for 2st tethered iface */
-				if (IPACM_OffloadManager::num_offload_v4_tethered_iface > 1)
-				{
-					IPACMDBG_H("Not support 2st downstream iface %s for xlat, cur: %d\n", dev_name,
-						IPACM_OffloadManager::num_offload_v4_tethered_iface);
-					return;
-				}
-			}
-
-			IPACMDBG_H(" support downstream iface %s, cur %d\n", dev_name,
-				IPACM_OffloadManager::num_offload_v4_tethered_iface);
-#endif
 			if (data->prefix.iptype < IPA_IP_MAX && is_downstream_set[data->prefix.iptype] == false)
 			{
 				IPACMDBG_H("Add downstream for IP iptype %d\n", data->prefix.iptype);
@@ -1905,6 +1887,25 @@ int IPACM_Lan::handle_wan_up_ex(ipacm_ext_prop *ext_prop, ipa_ip_type iptype, ui
 		ret = handle_uplink_filter_rule(ext_prop, iptype, xlat_mux_id);
 		modem_ul_v6_set = true;
 	} else if (iptype ==IPA_IP_v4 && modem_ul_v4_set == false) {
+#ifdef FEATURE_IPA_ANDROID
+				if (IPACM_Wan::isXlat())
+				{
+					/* indicate v4-offload */
+					IPACM_OffloadManager::num_offload_v4_tethered_iface++;
+					IPACMDBG_H("in xlat: update num_offload_v4_tethered_iface %d\n", IPACM_OffloadManager::num_offload_v4_tethered_iface);
+
+					/* xlat not support for 2st tethered iface */
+					if (IPACM_OffloadManager::num_offload_v4_tethered_iface > 1)
+					{
+						IPACMDBG_H("Not support 2st downstream iface %s for xlat, cur: %d\n", dev_name,
+							IPACM_OffloadManager::num_offload_v4_tethered_iface);
+						return IPACM_FAILURE;
+					}
+				}
+
+				IPACMDBG_H(" support downstream iface %s, cur %d\n", dev_name,
+					IPACM_OffloadManager::num_offload_v4_tethered_iface);
+#endif
 		/* add MTU rules for ipv4 */
 		handle_private_subnet_android(IPA_IP_v4);
 
@@ -4205,9 +4206,14 @@ int IPACM_Lan::handle_private_subnet_android(ipa_ip_type iptype)
 			mtu[i] = IPACM_Wan::queryMTU(ipa_if_num, IPA_IP_v4);
 
 			if (mtu[i] > 0)
+			{
 				mtu_rule_cnt++;
+				IPACMDBG_H("MTU[%d] is %d\n", i, mtu[i]);
+			}
 			else
-				IPACMERR("MTU is zero\n");
+			{
+				IPACMERR("MTU is 0");
+			}
 		}
 		IPACMDBG_H("total %d MTU rules are needed\n", mtu_rule_cnt);
 
@@ -4237,16 +4243,16 @@ int IPACM_Lan::handle_private_subnet_android(ipa_ip_type iptype)
 
 		flt_rule.rule.retain_hdr = 1;
 		flt_rule.rule.to_uc = 0;
-		flt_rule.rule.action = IPA_PASS_TO_ROUTING;
-		flt_rule.rule.eq_attrib_type = 0;
-		flt_rule.rule.rt_tbl_hdl = IPACM_Iface::ipacmcfg->rt_tbl_default_v4.hdl;
 		IPACMDBG_H("Private filter rule use table: %s\n",IPACM_Iface::ipacmcfg->rt_tbl_default_v4.name);
 
 		for (i = 0; i < (IPACM_Iface::ipacmcfg->ipa_num_private_subnet); i++)
 		{
 			/* add private subnet rule for ipv4 */
+			/* these 3 properties below will be reset during construct_mtu_rule */
 			flt_rule.rule.action = IPA_PASS_TO_ROUTING;
 			flt_rule.rule.eq_attrib_type = 0;
+			flt_rule.rule.rt_tbl_hdl = IPACM_Iface::ipacmcfg->rt_tbl_default_v4.hdl;
+
 			flt_rule.rule_hdl = private_fl_rule_hdl[i];
 			memcpy(&flt_rule.rule.attrib, &rx_prop->rx[0].attrib, sizeof(flt_rule.rule.attrib));
 			flt_rule.rule.attrib.attrib_mask |= IPA_FLT_DST_ADDR;
@@ -4264,7 +4270,9 @@ int IPACM_Lan::handle_private_subnet_android(ipa_ip_type iptype)
 				flt_rule.rule.attrib.u.v4.src_addr = IPACM_Iface::ipacmcfg->private_subnet_table[i].subnet_addr;
 				flt_rule.rule.attrib.attrib_mask |= IPA_FLT_SRC_ADDR;
 				if (construct_mtu_rule(&flt_rule.rule, IPA_IP_v4, mtu[i]))
+				{
 					IPACMERR("Failed to modify MTU filtering rule.\n");
+				}
 				memcpy(&(pFilteringTable->rules[mtu_rule_idx + i]), &flt_rule, sizeof(struct ipa_flt_rule_mdfy));
 				IPACMDBG_H("Adding MTU rule for private subnet 0x%x.\n", flt_rule.rule.attrib.u.v4.src_addr);
 			}
@@ -4302,7 +4310,14 @@ int IPACM_Lan::install_ipv6_prefix_flt_rule(uint32_t* prefix)
 
 	uint16_t mtu = IPACM_Wan::queryMTU(ipa_if_num, IPA_IP_v6);
 	if (mtu > 0)
+	{
+		IPACMDBG_H("MTU is %d\n", mtu);
 		rule_cnt ++;
+	}
+	else
+	{
+		IPACMERR("MTU is 0");
+	}
 
 	if(rx_prop != NULL)
 	{

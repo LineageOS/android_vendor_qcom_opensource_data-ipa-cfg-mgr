@@ -421,17 +421,6 @@ void* IPACM_ConntrackClient::TCPRegisterWithConnTrack(void *)
 	unsigned subscrips = 0;
 
 	IPACMDBG("\n");
-	/* In Android we get conntrack handles once after tethering is enabled but we
-	   loose connections info for embedded traffic if running before. So no NAT
-	   entries are added for embedded traffic due to which we see NAT exception and
-	   data takes S/W path which results in less throughput. Hence for embedded
-	   traffic info, framework sends conntrack dump before providing handles. Here
-	   reading ct entries before creating filter on Fd in order to have NAT entries
-	   for both TCP/UDP embedded traffic. */
-	if(CtList != NULL && !CtList->isReadCTDone)
-	{
-		CtList->readConntrack();
-	}
 
 	pClient = IPACM_ConntrackClient::GetInstance();
 	if(pClient == NULL)
@@ -585,7 +574,8 @@ void* IPACM_ConntrackClient::UDPRegisterWithConnTrack(void *)
 	/* Block to catch events from net filter connection track */
 ctcatch:
 	ret = nfct_catch(pClient->udp_hdl);
-	if((ret == -1) && (errno != ENOMSG))
+	/* Due to conntrack dump, sequence number might mismatch for initial events. */
+	if((ret == -1) && (errno != ENOMSG) && (errno != EILSEQ))
 	{
 		IPACMDBG("(%d)(%d)(%s)\n", ret, errno, strerror(errno));
 		return NULL;

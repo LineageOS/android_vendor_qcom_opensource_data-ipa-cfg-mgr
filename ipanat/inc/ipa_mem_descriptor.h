@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2018-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2019 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -26,63 +26,47 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#ifndef IPA_MEM_DESCRIPTOR_H
+#define IPA_MEM_DESCRIPTOR_H
 
-/*=========================================================================*/
-/*!
-	@file
-	ipa_nat_test001.c
+#include <stdint.h>
+#include <stdbool.h>
+#include <linux/msm_ipa.h>
 
-	@brief
-	Verify the following scenario:
-	1. Add ipv4 table
-	2. Add ipv4 rule
-	3. Delete ipv4 table
-*/
-/*===========================================================================*/
-
-#include "ipa_nat_test.h"
-
-int ipa_nat_test001(
-	const char* nat_mem_type,
-	u32 pub_ip_add,
-	int total_entries,
-	u32 tbl_hdl,
-	int sep,
-	void* arb_data_ptr)
+typedef struct
 {
-	int* tbl_hdl_ptr = (int*) arb_data_ptr;
-	int ret;
-	u32 rule_hdl;
-	ipa_nat_ipv4_rule ipv4_rule = {0};
+	int orig_rqst_size;
+	int mmap_size;
+	void* base_addr;
+	void* mmap_addr;
+	uint32_t addr_offset;
+	unsigned long allocate_ioctl_num;
+	unsigned long delete_ioctl_num;
+	char name[IPA_RESOURCE_NAME_MAX];
+	uint8_t table_index;
+	uint8_t valid;
+	bool consider_using_sram;
+	bool sram_available;
+	bool sram_to_be_used;
+	struct ipa_nat_in_sram_info nat_sram_info;
+} ipa_mem_descriptor;
 
-	ipv4_rule.target_ip = RAN_ADDR;
-	ipv4_rule.target_port = RAN_PORT;
+void ipa_mem_descriptor_init(
+	ipa_mem_descriptor* desc,
+	const char* device_name,
+	int size,
+	uint8_t table_index,
+	unsigned long allocate_ioctl_num,
+	unsigned long delete_ioctl_num,
+	bool consider_using_sram );
 
-	ipv4_rule.private_ip = RAN_ADDR;
-	ipv4_rule.private_port = RAN_PORT;
+int ipa_mem_descriptor_allocate_memory(
+	ipa_mem_descriptor* desc,
+	int ipa_fd);
 
-	ipv4_rule.protocol = IPPROTO_TCP;
-	ipv4_rule.public_port = RAN_PORT;
+int ipa_mem_descriptor_delete(
+	ipa_mem_descriptor* desc,
+	int ipa_fd);
 
-	IPADBG("In\n");
+#endif
 
-	if ( sep )
-	{
-		ret = ipa_nat_add_ipv4_tbl(pub_ip_add, nat_mem_type, total_entries, &tbl_hdl);
-		CHECK_ERR_TBL_STOP(ret, tbl_hdl);
-	}
-
-	ret = ipa_nat_add_ipv4_rule(tbl_hdl, &ipv4_rule, &rule_hdl);
-	CHECK_ERR_TBL_STOP(ret, tbl_hdl);
-
-	if ( sep )
-	{
-		ret = ipa_nat_del_ipv4_tbl(tbl_hdl);
-		*tbl_hdl_ptr = 0;
-		CHECK_ERR(ret);
-	}
-
-	IPADBG("Out\n");
-
-	return 0;
-}

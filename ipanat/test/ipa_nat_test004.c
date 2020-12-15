@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014, 2018-2020 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -35,36 +35,49 @@
 	@brief
 	Verify the following scenario:
 	1. Add ipv4 table
-	2. Query nat table handle
+	2. Delete a bogus table handle
 	3. Delete ipv4 table
 */
 /*===========================================================================*/
 
 #include "ipa_nat_test.h"
-#include "ipa_nat_drv.h"
 
-int ipa_nat_test004(int total_entries, u32 tbl_hdl, u8 sep)
+int ipa_nat_test004(
+	const char* nat_mem_type,
+	u32 pub_ip_add,
+	int total_entries,
+	u32 tbl_hdl,
+	int sep,
+	void* arb_data_ptr)
 {
+	int* tbl_hdl_ptr = (int*) arb_data_ptr;
 	int ret = 0;
-	u32 tbl_hdl1 = 0;
-	u32 pub_ip_add = 0x011617c0;   /* "192.23.22.1" */
+	u32 tbl_hdl1 = 0xFFFFFFFF;
 
-	IPADBG("%s():\n",__FUNCTION__);
+	IPADBG("In\n");
 
-	if(sep)
+	if ( sep )
 	{
-		ret = ipa_nat_add_ipv4_tbl(pub_ip_add, total_entries, &tbl_hdl);
-		CHECK_ERR(ret);
-
-		ret = ipa_nat_del_ipv4_tbl(tbl_hdl);
-		CHECK_ERR(ret);
-
-		ret = ipa_nat_del_ipv4_tbl(tbl_hdl1);
-		if(ret == 0)
-		{
-			IPAERR("able to delete table using invalid table handle\n");
-			return -1;
-		}
+		ret = ipa_nat_add_ipv4_tbl(pub_ip_add, nat_mem_type, total_entries, &tbl_hdl);
+		CHECK_ERR_TBL_STOP(ret, tbl_hdl);
 	}
+
+	ret = ipa_nat_del_ipv4_tbl(tbl_hdl1); /* intentionally pass bad handle */
+
+	if ( ret == 0 )
+	{
+		IPAERR("Able to delete table using invalid table handle\n");
+		CHECK_ERR_TBL_STOP(-1, tbl_hdl);
+	}
+
+	if ( sep )
+	{
+		ret = ipa_nat_del_ipv4_tbl(tbl_hdl);
+		*tbl_hdl_ptr = 0;
+		CHECK_ERR(ret);
+	}
+
+	IPADBG("Out\n");
+
 	return 0;
 }

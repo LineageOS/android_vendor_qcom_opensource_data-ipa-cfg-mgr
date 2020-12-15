@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014, 2018-2020 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -26,615 +26,482 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-
 #include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <libgen.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <errno.h>
 
-#include "ipa_nat_drv.h"
-#include "ipa_nat_drvi.h"
 #include "ipa_nat_test.h"
+#include "ipa_nat_map.h"
 
-extern struct ipa_nat_cache ipv4_nat_cache;
+#undef strcasesame
+#define strcasesame(x, y) \
+	(! strcasecmp((x), (y)))
 
-int chk_for_loop(u32 tbl_hdl)
+static inline const char* legal_mem_type(
+	const char* mt )
 {
-	struct ipa_nat_rule *tbl_ptr;
-	struct ipa_nat_indx_tbl_rule *indx_tbl_ptr;
-	int cnt;
-	uint16_t cur_entry;
+	if ( strcasesame(mt, "DDR") )    return "DDR";
+	if ( strcasesame(mt, "SRAM") )   return "SRAM";
+	if ( strcasesame(mt, "HYBRID") ) return "HYBRID";
+	return NULL;
+}
 
-	if (IPA_NAT_INVALID_NAT_ENTRY == tbl_hdl ||
-			tbl_hdl > IPA_NAT_MAX_IP4_TBLS) {
-		IPAERR("invalid table handle passed \n");
+static int nat_rule_loop_check(
+	ipa_table*      table_ptr,
+	uint32_t        rule_hdl,
+	void*           record_ptr,
+	uint16_t        record_index,
+	void*           meta_record_ptr,
+	uint16_t        meta_record_index,
+	void*           arb_data_ptr )
+{
+	enum ipa3_nat_mem_in nmi;
+	uint8_t              is_expn_tbl;
+	uint16_t             rule_index;
+	uint32_t             tbl_hdl = (uint32_t) arb_data_ptr;
+
+	struct ipa_nat_rule* rule_ptr =
+		(struct ipa_nat_rule*) record_ptr;
+
+	BREAK_RULE_HDL(table_ptr, rule_hdl, nmi, is_expn_tbl, rule_index);
+
+	/*
+	 * By virtue of this function being called back by the walk, this
+	 * record_index is valid.  Denote it as such in the map...
+	 */
+	if ( ipa_nat_map_add(MAP_NUM_99, record_index, 1) )
+	{
+		IPAERR("ipa_nat_map_add(index(%u)) failed\n", record_index);
 		return -EINVAL;
 	}
 
-	IPADBG("checking ipv4 rules:\n");
-	tbl_ptr = (struct ipa_nat_rule *)
-			ipv4_nat_cache.ip4_tbl[tbl_hdl-1].ipv4_rules_addr;
-	for (cnt = 0;
-		cnt < ipv4_nat_cache.ip4_tbl[tbl_hdl - 1].table_entries;
-		cnt++) {
-		if (Read16BitFieldValue(tbl_ptr[cnt].ip_cksm_enbl,ENABLE_FIELD)) {
-			if(Read16BitFieldValue(tbl_ptr[cnt].nxt_indx_pub_port,
-							NEXT_INDEX_FIELD) == cnt)
-			{
-				IPAERR("Infinite loop detected, entry\n");
-				ipa_nati_print_rule(&tbl_ptr[cnt], cnt);
-				return -EINVAL;
-			}
-		}
+	if ( rule_ptr->next_index == record_index )
+	{
+		IPAERR("Infinite loop detected in IPv4 %s table, entry %u\n",
+			   (is_expn_tbl) ? "expansion" : "base",
+			   record_index);
+
+		ipa_nat_dump_ipv4_table(tbl_hdl);
+
+		return -EINVAL;
 	}
 
-	/* Print ipv4 expansion rules */
-	IPADBG("checking ipv4 active expansion rules:\n");
-	tbl_ptr = (struct ipa_nat_rule *)
-			ipv4_nat_cache.ip4_tbl[tbl_hdl-1].ipv4_expn_rules_addr;
-	for (cnt = 0;
-		cnt <= ipv4_nat_cache.ip4_tbl[tbl_hdl - 1].expn_table_entries;
-		cnt++) {
-		if (Read16BitFieldValue(tbl_ptr[cnt].ip_cksm_enbl,
-								ENABLE_FIELD)) {
-			cur_entry =
-				cnt + ipv4_nat_cache.ip4_tbl[tbl_hdl - 1].table_entries;
-			if (Read16BitFieldValue(tbl_ptr[cnt].nxt_indx_pub_port,
-							NEXT_INDEX_FIELD) == cur_entry)
-			{
-				IPAERR("Infinite loop detected\n");
-				ipa_nati_print_rule(&tbl_ptr[cnt],
-					(cnt + ipv4_nat_cache.ip4_tbl[tbl_hdl - 1].table_entries));
-				return -EINVAL;
-			}
-		}
-	}
-
-	/* Print ipv4 index rules */
-	IPADBG("checking ipv4 index active rules: \n");
-	indx_tbl_ptr = (struct ipa_nat_indx_tbl_rule *)
-			ipv4_nat_cache.ip4_tbl[tbl_hdl-1].index_table_addr;
-	for (cnt = 0;
-		 cnt < ipv4_nat_cache.ip4_tbl[tbl_hdl - 1].table_entries;
-			 cnt++) {
-		if (Read16BitFieldValue(indx_tbl_ptr[cnt].tbl_entry_nxt_indx,
-							INDX_TBL_TBL_ENTRY_FIELD)) {
-			if (Read16BitFieldValue(indx_tbl_ptr[cnt].tbl_entry_nxt_indx,
-							INDX_TBL_NEXT_INDEX_FILED) == cnt)
-			{
-				IPAERR("Infinite loop detected\n");
-				ipa_nati_print_index_rule(&indx_tbl_ptr[cnt], cnt, 0);
-				return -EINVAL;
-			}
-		}
-	}
-
-	/* Print ipv4 index expansion rules */
-	IPADBG("Checking ipv4 index expansion active rules: \n");
-	indx_tbl_ptr = (struct ipa_nat_indx_tbl_rule *)
-			ipv4_nat_cache.ip4_tbl[tbl_hdl-1].index_table_expn_addr;
-	for (cnt = 0;
-		cnt <= ipv4_nat_cache.ip4_tbl[tbl_hdl - 1].expn_table_entries;
-			 cnt++) {
-		if (Read16BitFieldValue(indx_tbl_ptr[cnt].tbl_entry_nxt_indx,
-							INDX_TBL_TBL_ENTRY_FIELD)) {
-			cur_entry =
-				cnt + ipv4_nat_cache.ip4_tbl[tbl_hdl - 1].table_entries;
-			if (Read16BitFieldValue(indx_tbl_ptr[cnt].tbl_entry_nxt_indx,
-							INDX_TBL_NEXT_INDEX_FILED) == cur_entry)
-			{
-				IPAERR("Infinite loop detected\n");
-				ipa_nati_print_index_rule(&indx_tbl_ptr[cnt],
-					(cnt + ipv4_nat_cache.ip4_tbl[tbl_hdl - 1].table_entries),
-				ipv4_nat_cache.ip4_tbl[tbl_hdl - 1].index_expn_table_meta[cnt].prev_index);
-				return -EINVAL;
-			}
-		}
-	}
 	return 0;
 }
 
-uint8_t is_base_entry_valid(u32 tbl_hdl, u16 entry)
+static int nat_rule_validity_check(
+	ipa_table*      table_ptr,
+	uint32_t        rule_hdl,
+	void*           record_ptr,
+	uint16_t        record_index,
+	void*           meta_record_ptr,
+	uint16_t        meta_record_index,
+	void*           arb_data_ptr )
 {
-	struct ipa_nat_rule *tbl_ptr;
+	enum ipa3_nat_mem_in nmi;
+	uint8_t              is_expn_tbl;
+	uint16_t             rule_index;
+	uint16_t             index;
 
-	if (entry >
-		ipv4_nat_cache.ip4_tbl[tbl_hdl - 1].table_entries)
-	{
-		tbl_ptr = (struct ipa_nat_rule *)
-				ipv4_nat_cache.ip4_tbl[tbl_hdl-1].ipv4_expn_rules_addr;
-		entry -=
-			ipv4_nat_cache.ip4_tbl[tbl_hdl - 1].table_entries;
-	}
-	else
-	{
-		tbl_ptr = (struct ipa_nat_rule *)
-				ipv4_nat_cache.ip4_tbl[tbl_hdl-1].ipv4_rules_addr;
-	}
-	return (Read16BitFieldValue(tbl_ptr[entry].ip_cksm_enbl,
-							ENABLE_FIELD));
-}
+	struct ipa_nat_rule* rule_ptr =
+		(struct ipa_nat_rule*) record_ptr;
 
-uint8_t is_index_entry_valid(u32 tbl_hdl, u16 entry)
-{
-	struct ipa_nat_indx_tbl_rule *tbl_ptr;
+	BREAK_RULE_HDL(table_ptr, rule_hdl, nmi, is_expn_tbl, rule_index);
 
-	if (entry >
-		ipv4_nat_cache.ip4_tbl[tbl_hdl - 1].table_entries)
-	{
-		tbl_ptr = (struct ipa_nat_indx_tbl_rule *)
-				ipv4_nat_cache.ip4_tbl[tbl_hdl-1].index_table_expn_addr;
-		entry -=
-			ipv4_nat_cache.ip4_tbl[tbl_hdl - 1].table_entries;
-	}
-	else
-	{
-		tbl_ptr = (struct ipa_nat_indx_tbl_rule *)
-				ipv4_nat_cache.ip4_tbl[tbl_hdl-1].index_table_addr;
-	}
-	if (Read16BitFieldValue(tbl_ptr[entry].tbl_entry_nxt_indx,
-						INDX_TBL_TBL_ENTRY_FIELD)) {
-		return 1;
-	}
-	else
-	{
-		return 0;
-	}
-}
+	index = rule_ptr->next_index;
 
-int chk_for_validity(u32 tbl_hdl)
-{
-	struct ipa_nat_rule *tbl_ptr;
-	struct ipa_nat_indx_tbl_rule *indx_tbl_ptr;
-	uint16_t nxt_index, prv_index;
-	int cnt;
+	if ( index && ipa_nat_map_find(MAP_NUM_99, index, NULL) )
+	{
+		IPAERR("Invalid next index %u found in IPv4 %s table entry %u\n",
+			   index,
+			   (is_expn_tbl) ? "expansion" : "base",
+			   rule_index);
 
-	if (IPA_NAT_INVALID_NAT_ENTRY == tbl_hdl ||
-			tbl_hdl > IPA_NAT_MAX_IP4_TBLS) {
-		IPAERR("invalid table handle passed \n");
 		return -EINVAL;
 	}
 
-	/* Validate base table next_indx and prev_indx values */
-	IPADBG("Validating ipv4 active rules: \n");
-	tbl_ptr = (struct ipa_nat_rule *)
-			ipv4_nat_cache.ip4_tbl[tbl_hdl-1].ipv4_rules_addr;
-	for (cnt = 0;
-		cnt < ipv4_nat_cache.ip4_tbl[tbl_hdl - 1].table_entries;
-			 cnt++) {
-		if (Read16BitFieldValue(tbl_ptr[cnt].ip_cksm_enbl,
-						ENABLE_FIELD)) {
-			nxt_index =
-			Read16BitFieldValue(tbl_ptr[cnt].nxt_indx_pub_port,
-						NEXT_INDEX_FIELD);
-			if (!is_base_entry_valid(tbl_hdl, nxt_index)) {
-				IPAERR("Invalid next index found, entry:%d\n", cnt);
-			}
-		}
-	}
+	if ( is_expn_tbl )
+	{
+		index = rule_ptr->prev_index;
 
-	IPADBG("Validating ipv4 expansion active rules: \n");
-	tbl_ptr = (struct ipa_nat_rule *)
-			ipv4_nat_cache.ip4_tbl[tbl_hdl-1].ipv4_expn_rules_addr;
-	for (cnt = 0;
-		cnt <= ipv4_nat_cache.ip4_tbl[tbl_hdl - 1].expn_table_entries;
-			 cnt++) {
-		if (Read16BitFieldValue(tbl_ptr[cnt].ip_cksm_enbl,
-							ENABLE_FIELD)) {
-			/* Validate next index */
-			nxt_index =
-				Read16BitFieldValue(tbl_ptr[cnt].nxt_indx_pub_port,
-									NEXT_INDEX_FIELD);
-			if (!is_base_entry_valid(tbl_hdl, nxt_index)) {
-				IPAERR("Invalid next index found, entry:%d\n", cnt);
-			}
-			/* Validate previous index */
-			prv_index =
-				Read16BitFieldValue(tbl_ptr[cnt].sw_spec_params,
-						SW_SPEC_PARAM_PREV_INDEX_FIELD);
-			if (!is_base_entry_valid(tbl_hdl, prv_index)) {
-				IPAERR("Invalid Previous index found, entry:%d\n", cnt);
-			}
-		}
-	}
+		if ( index && ipa_nat_map_find(MAP_NUM_99, index, NULL) )
+		{
+			IPAERR("Invalid previous index %u found in IPv4 %s table entry %u\n",
+				   index,
+				   "expansion",
+				   rule_index);
 
-	IPADBG("Validating ipv4 index active rules: \n");
-	indx_tbl_ptr = (struct ipa_nat_indx_tbl_rule *)
-				ipv4_nat_cache.ip4_tbl[tbl_hdl-1].index_table_addr;
-	for (cnt = 0;
-		cnt < ipv4_nat_cache.ip4_tbl[tbl_hdl - 1].table_entries;
-			 cnt++) {
-		if (Read16BitFieldValue(indx_tbl_ptr[cnt].tbl_entry_nxt_indx,
-							INDX_TBL_TBL_ENTRY_FIELD)) {
-			nxt_index =
-				Read16BitFieldValue(indx_tbl_ptr[cnt].tbl_entry_nxt_indx,
-							INDX_TBL_NEXT_INDEX_FILED);
-			if (!is_index_entry_valid(tbl_hdl, nxt_index)) {
-				IPAERR("Invalid next index found, entry:%d\n", cnt);
-			}
-		}
-	}
-
-	IPADBG("Validating ipv4 index expansion active rules: \n");
-	indx_tbl_ptr = (struct ipa_nat_indx_tbl_rule *)
-	ipv4_nat_cache.ip4_tbl[tbl_hdl-1].index_table_expn_addr;
-	for (cnt = 0;
-		cnt <= ipv4_nat_cache.ip4_tbl[tbl_hdl - 1].expn_table_entries;
-			 cnt++) {
-		if (Read16BitFieldValue(indx_tbl_ptr[cnt].tbl_entry_nxt_indx,
-								INDX_TBL_TBL_ENTRY_FIELD)) {
-			/* Validate next index*/
-			nxt_index =
-				Read16BitFieldValue(indx_tbl_ptr[cnt].tbl_entry_nxt_indx,
-								INDX_TBL_NEXT_INDEX_FILED);
-			if (!is_index_entry_valid(tbl_hdl, nxt_index)) {
-				IPAERR("Invalid next index found, entry:%d\n", cnt);
-			}
-
-			/* Validate previous index*/
-			prv_index =
-				ipv4_nat_cache.ip4_tbl[tbl_hdl-1].index_expn_table_meta[cnt].prev_index;
-
-			if (!is_index_entry_valid(tbl_hdl, prv_index)) {
-				IPAERR("Invalid Previous index found, entry:%d\n", cnt);
-			}
+			return -EINVAL;
 		}
 	}
 
 	return 0;
 }
 
-int ipa_nat_validate_ipv4_table(u32 tbl_hdl)
+static int index_loop_check(
+	ipa_table*      table_ptr,
+	uint32_t        rule_hdl,
+	void*           record_ptr,
+	uint16_t        record_index,
+	void*           meta_record_ptr,
+	uint16_t        meta_record_index,
+	void*           arb_data_ptr )
 {
-	int ret = 0;
+	enum ipa3_nat_mem_in nmi;
+	uint8_t              is_expn_tbl;
+	uint16_t             rule_index;
+	uint32_t             tbl_hdl = (uint32_t) arb_data_ptr;
 
-	ret = chk_for_loop(tbl_hdl);
-	if (ret)
+	struct ipa_nat_indx_tbl_rule* itr_ptr =
+		(struct ipa_nat_indx_tbl_rule*) record_ptr;
+
+	BREAK_RULE_HDL(table_ptr, rule_hdl, nmi, is_expn_tbl, rule_index);
+
+	/*
+	 * By virtue of this function being called back by the walk, this
+	 * record_index is valid.  Denote it as such in the map...
+	 */
+	if ( ipa_nat_map_add(MAP_NUM_99, record_index, 1) )
+	{
+		IPAERR("ipa_nat_map_add(index(%u)) failed\n", record_index);
+		return -EINVAL;
+	}
+
+	if ( itr_ptr->next_index == record_index )
+	{
+		IPAERR("Infinite loop detected in IPv4 index %s table, entry %u\n",
+			   (is_expn_tbl) ? "expansion" : "base",
+			   record_index);
+
+		ipa_nat_dump_ipv4_table(tbl_hdl);
+
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int index_validity_check(
+	ipa_table*      table_ptr,
+	uint32_t        rule_hdl,
+	void*           record_ptr,
+	uint16_t        record_index,
+	void*           meta_record_ptr,
+	uint16_t        meta_record_index,
+	void*           arb_data_ptr )
+{
+	enum ipa3_nat_mem_in nmi;
+	uint8_t              is_expn_tbl;
+	uint16_t             rule_index;
+	uint16_t             index;
+
+	struct ipa_nat_indx_tbl_rule* itr_ptr =
+		(struct ipa_nat_indx_tbl_rule*) record_ptr;
+
+	BREAK_RULE_HDL(table_ptr, rule_hdl, nmi, is_expn_tbl, rule_index);
+
+	index = itr_ptr->next_index;
+
+	if ( index && ipa_nat_map_find(MAP_NUM_99, index, NULL) )
+	{
+		IPAERR("Invalid next index %u found in IPv4 index %s table entry %u\n",
+			   index,
+			   (is_expn_tbl) ? "expansion" : "base",
+			   rule_index);
+
+		return -EINVAL;
+	}
+
+	if ( is_expn_tbl )
+	{
+		struct ipa_nat_indx_tbl_meta_info* mi_ptr = meta_record_ptr;
+
+		if ( ! mi_ptr )
+		{
+			IPAERR("Missing meta pointer for IPv4 index %s table entry %u\n",
+				   "expansion",
+				   rule_index);
+
+			return -EINVAL;
+		}
+
+		index = mi_ptr->prev_index;
+
+		if ( index && ipa_nat_map_find(MAP_NUM_99, index, NULL) )
+		{
+			IPAERR("Invalid previous index %u found in IPv4 index %s table entry %u\n",
+				   index,
+				   "expansion",
+				   rule_index);
+
+			return -EINVAL;
+		}
+	}
+
+	return 0;
+}
+
+int ipa_nat_validate_ipv4_table(
+	u32 tbl_hdl )
+{
+	int ret;
+
+	/*
+	 * Map MAP_NUM_99 will be used to keep, and to check for,
+	 * record validity.
+	 *
+	 * The first walk will fill it. The second walk will use it...
+	 */
+	ipa_nat_map_clear(MAP_NUM_99);
+
+	IPADBG("Checking IPv4 active rules:\n");
+
+	ret = ipa_nati_walk_ipv4_tbl(tbl_hdl, USE_NAT_TABLE, nat_rule_loop_check, tbl_hdl);
+
+	if ( ret != 0 )
+	{
 		return ret;
-	ret = chk_for_validity(tbl_hdl);
+	}
 
-	return ret;
+	ret = ipa_nati_walk_ipv4_tbl(tbl_hdl, USE_NAT_TABLE, nat_rule_validity_check, 0);
+
+	if ( ret != 0 )
+	{
+		return ret;
+	}
+
+	/*
+	 * Map MAP_NUM_99 will be used to keep, and to check for,
+	 * record validity.
+	 *
+	 * The first walk will fill it. The second walk will use it...
+	 */
+	ipa_nat_map_clear(MAP_NUM_99);
+
+	IPADBG("Checking IPv4 index active rules:\n");
+
+	ret = ipa_nati_walk_ipv4_tbl(tbl_hdl, USE_INDEX_TABLE, index_loop_check, tbl_hdl);
+
+	if ( ret != 0 )
+	{
+		return ret;
+	}
+
+	ret = ipa_nati_walk_ipv4_tbl(tbl_hdl, USE_INDEX_TABLE, index_validity_check, 0);
+
+	if ( ret != 0 )
+	{
+		return ret;
+	}
+
+	return 0;
 }
 
-int main(int argc, char* argv[])
+static void
+_dispUsage(
+	const char* progNamePtr )
 {
-	int exec = 0, pass = 0, ret;
-	int cnt, nt=1;
-	int total_entries = 100;
-	u8 sep = 0;
-	u32 tbl_hdl = 0;
-	u32 pub_ip_add = 0x011617c0;   /* "192.23.22.1" */
+	printf(
+		"Usage: %s [-d -r N -i N -e N -m mt]\n"
+		"Where:\n"
+		"  -d     Each test is discrete (create table, add rules, destroy table)\n"
+		"         If not specified, only one table create and destroy for all tests\n"
+		"  -r N   Where N is the number of times to run the inotify regression test\n"
+		"  -i N   Where N is the number of times (iterations) to run test\n"
+		"  -e N   Where N is the number of entries in the NAT\n"
+		"  -m mt  Where mt is the type of memory to use for the NAT\n"
+		"         Legal mt's: DDR, SRAM, or HYBRID (ie. use SRAM and DDR)\n"
+		"  -g M-N Run tests M through N only\n",
+		progNamePtr);
 
-	IPADBG("ipa_nat_testing user space nat driver\n");
+	fflush(stdout);
+}
 
-	if (argc == 4)
+static NatTests nt_array[] = {
+	NAT_TEST_ENTRY(ipa_nat_test000, 1, 0),
+	NAT_TEST_ENTRY(ipa_nat_test001, 1, 0),
+	NAT_TEST_ENTRY(ipa_nat_test002, 1, 0),
+	NAT_TEST_ENTRY(ipa_nat_test003, 1, 0),
+	NAT_TEST_ENTRY(ipa_nat_test004, 1, 0),
+	NAT_TEST_ENTRY(ipa_nat_test005, 1, 0),
+	NAT_TEST_ENTRY(ipa_nat_test006, 1, 0),
+	NAT_TEST_ENTRY(ipa_nat_test007, 1, 0),
+	NAT_TEST_ENTRY(ipa_nat_test008, 1, 0),
+	NAT_TEST_ENTRY(ipa_nat_test009, 1, 0),
+	NAT_TEST_ENTRY(ipa_nat_test010, IPA_NAT_TEST_PRE_COND_TE, 0),
+	NAT_TEST_ENTRY(ipa_nat_test011, IPA_NAT_TEST_PRE_COND_TE, 0),
+	NAT_TEST_ENTRY(ipa_nat_test012, IPA_NAT_TEST_PRE_COND_TE, 0),
+	NAT_TEST_ENTRY(ipa_nat_test013, IPA_NAT_TEST_PRE_COND_TE, 0),
+	NAT_TEST_ENTRY(ipa_nat_test014, IPA_NAT_TEST_PRE_COND_TE, 0),
+	NAT_TEST_ENTRY(ipa_nat_test015, IPA_NAT_TEST_PRE_COND_TE, 0),
+	NAT_TEST_ENTRY(ipa_nat_test016, IPA_NAT_TEST_PRE_COND_TE, 0),
+	NAT_TEST_ENTRY(ipa_nat_test017, IPA_NAT_TEST_PRE_COND_TE, 0),
+	NAT_TEST_ENTRY(ipa_nat_test018, IPA_NAT_TEST_PRE_COND_TE, 0),
+	NAT_TEST_ENTRY(ipa_nat_test019, IPA_NAT_TEST_PRE_COND_TE, 0),
+	NAT_TEST_ENTRY(ipa_nat_test020, IPA_NAT_TEST_PRE_COND_TE, 0),
+	NAT_TEST_ENTRY(ipa_nat_test021, IPA_NAT_TEST_PRE_COND_TE, 0),
+	NAT_TEST_ENTRY(ipa_nat_test022, IPA_NAT_TEST_PRE_COND_TE, 0),
+	NAT_TEST_ENTRY(ipa_nat_test023, IPA_NAT_TEST_PRE_COND_TE, 0),
+	NAT_TEST_ENTRY(ipa_nat_test024, IPA_NAT_TEST_PRE_COND_TE, 0),
+	NAT_TEST_ENTRY(ipa_nat_test025, IPA_NAT_TEST_PRE_COND_TE, 0),
+	/*
+	 * Add new tests just above this comment. Keep the following two
+	 * at the end...
+	 */
+	NAT_TEST_ENTRY(ipa_nat_test999, 1, 0),
+	NAT_TEST_ENTRY(ipa_nat_testREG, 1, 0),
+};
+
+int main(
+	int   argc,
+	char* argv[] )
+{
+	int      sep        = 0;
+	int      ireg       = 0;
+	uint32_t nt         = 1;
+	int      total_ents = 100;
+	uint32_t ht         = 0;
+	uint32_t start = 0, end = 0;
+
+	char* nat_mem_type = "DDR";
+
+	uint32_t tbl_hdl    = 0;
+
+	uint32_t pub_ip_addr;
+
+	uint32_t i, ub, cnt, exec, pass;
+
+	void*    adp;
+
+	time_t   t;
+
+	int      c, ret;
+
+	IPADBG("Testing user space nat driver\n");
+
+	while ( (c = getopt(argc, argv, "dr:i:e:m:h:g:?")) != -1 )
 	{
-		if (!strncmp(argv[1], "reg", 3))
+		switch (c)
 		{
-			nt = atoi(argv[2]);
-			total_entries = atoi(argv[3]);
-			IPADBG("Reg: %d, Nat Entries: %d\n", nt, total_entries);
-		}
-		else if (!strncmp(argv[1], "sep", 3))
-		{
+		case 'd':
 			sep = 1;
-			nt = atoi(argv[2]);
-			total_entries = atoi(argv[3]);
+			break;
+		case 'r':
+			ireg = atoi(optarg);
+			break;
+		case 'i':
+			nt = atoi(optarg);
+			break;
+		case 'e':
+			total_ents = atoi(optarg);
+			break;
+		case 'm':
+			if ( ! (nat_mem_type = legal_mem_type(optarg)) )
+			{
+				fprintf(stderr, "Illegal: -m %s\n", optarg);
+				_dispUsage(basename(argv[0]));
+				exit(0);
+			}
+			break;
+		case 'h':
+			ht = atoi(optarg);
+			break;
+		case 'g':
+			if ( sscanf(optarg, "%u-%u", &start, &end) != 2
+				 ||
+				 ( start >= end || end >= array_sz(nt_array) - 1 ) )
+			{
+				fprintf(stderr, "Illegal: -f %s\n", optarg);
+				_dispUsage(basename(argv[0]));
+				exit(0);
+			}
+			break;
+		case '?':
+		default:
+			_dispUsage(basename(argv[0]));
+			exit(0);
+			break;
 		}
 	}
-	else if (argc == 3)
+
+	srand(time(&t));
+
+	pub_ip_addr = RAN_ADDR;
+
+	exec = pass = 0;
+
+	for ( cnt = ret = 0; cnt < nt && ret == 0; cnt++ )
 	{
-		if (!strncmp(argv[1], "inotify", 7))
+		IPADBG("ITERATION [%u] OF TESING\n", cnt + 1);
+
+		if ( ireg )
 		{
-			ipa_nat_test021(total_entries, atoi(argv[2]));
-			return 0;
+			adp = &ireg;
+			i   = array_sz(nt_array) - 1;
+			ub  = array_sz(nt_array);
 		}
-		else if (!strncmp(argv[1], "sep", 3))
+		else
 		{
-			sep = 1;
-			total_entries = atoi(argv[2]);
+			adp = &tbl_hdl;
+			i   = ( end ) ? start : 0;
+			ub  = ( end ) ? end   : array_sz(nt_array) - 1;
+
+			if ( i != 0 && ! sep )
+			{
+				ipa_nat_test000(
+					nat_mem_type, pub_ip_addr, total_ents, tbl_hdl, 0, adp);
+			}
+		}
+
+		for ( ; i < ub && ret == 0; i++ )
+		{
+			if ( total_ents >= nt_array[i].num_ents_trigger )
+			{
+				IPADBG("+------------------------------------------------+\n");
+				IPADBG("|        Executing test: %s         |\n", nt_array[i].func_name);
+				IPADBG("+------------------------------------------------+\n");
+
+				ret = nt_array[i].func(
+					nat_mem_type, pub_ip_addr, total_ents, tbl_hdl, sep, adp);
+
+				exec++;
+
+				if ( ret == 0 )
+				{
+					IPADBG("<<<<< Test %s SUCCEEDED >>>>>\n", nt_array[i].func_name);
+
+					pass++;
+
+					if ( ht || nt_array[i].test_hold_time_in_secs )
+					{
+						ht = (ht) ? ht : nt_array[i].test_hold_time_in_secs;
+
+						sleep(ht);
+					}
+				}
+				else
+				{
+					IPAERR("<<<<< Test %s FAILED >>>>>\n", nt_array[i].func_name);
+				}
+			}
 		}
 	}
-	else if (argc == 2)
+
+	if ( ret && tbl_hdl )
 	{
-		total_entries = atoi(argv[1]);
-		IPADBG("Nat Entries: %d\n", total_entries);
+		ipa_nat_test999(
+			nat_mem_type, pub_ip_addr, total_ents, tbl_hdl, 0, &tbl_hdl);
 	}
 
+	IPADBG("Total NAT Tests Run:%u, Pass:%u, Fail:%u\n",
+		   exec, pass, exec - pass);
 
-	for (cnt=0; cnt<nt; cnt++)
-	{
-		IPADBG("%s():Executing %d time \n",__FUNCTION__, cnt);
-
-		if (!sep)
-		{
-			ret = ipa_nat_add_ipv4_tbl(pub_ip_add, total_entries, &tbl_hdl);
-			CHECK_ERR(ret);
-		}
-
-		if (sep)
-		{
-			IPADBG("\n\nExecuting ipa_nat_test00%d\n", exec);
-			ret = ipa_nat_test000(total_entries, tbl_hdl, sep);
-			if (!ret)
-			{
-				pass++;
-			}
-			else
-			{
-				IPAERR("ipa_nat_test00%d Fail\n", exec);
-			}
-			exec++;
-
-			IPADBG("\n\nExecuting ipa_nat_test00%d\n", exec);
-			ret = ipa_nat_test001(total_entries, tbl_hdl, sep);
-			if (!ret)
-			{
-				pass++;
-			}
-			else
-			{
-				IPAERR("ipa_nat_test00%d Fail\n", exec);
-			}
-			exec++;
-		}
-
-		IPADBG("\n\nExecuting ipa_nat_test00%d\n", exec);
-		ret = ipa_nat_test002(total_entries, tbl_hdl, sep);
-		if (!ret)
-		{
-			pass++;
-		}
-		else
-		{
-			IPAERR("ipa_nat_test00%d Fail\n", exec);
-		}
-		exec++;
-
-		if (sep)
-		{
-			IPADBG("\n\nExecuting ipa_nat_test00%d\n", exec);
-			ret = ipa_nat_test003(total_entries, tbl_hdl, sep);
-			if (!ret)
-			{
-				pass++;
-			}
-			else
-			{
-				IPAERR("ipa_nat_test00%d Fail\n", exec);
-			}
-			exec++;
-
-			IPADBG("\n\nExecuting ipa_nat_test00%d\n", exec);
-			ret = ipa_nat_test004(total_entries, tbl_hdl, sep);
-			if (!ret)
-			{
-				pass++;
-			}
-			else
-			{
-				IPAERR("ipa_nat_test00%d Fail\n", exec);
-			}
-			exec++;
-
-			IPADBG("\n\nExecuting ipa_nat_test00%d\n", exec);
-			ret = ipa_nat_test005(total_entries, tbl_hdl, sep);
-			if (!ret)
-			{
-				pass++;
-			}
-			else
-			{
-				IPAERR("ipa_nat_test00%d Fail\n", exec);
-			}
-			exec++;
-		}
-
-		IPADBG("\n\nExecuting ipa_nat_test00%d\n", exec);
-		ret = ipa_nat_test006(total_entries, tbl_hdl, sep);
-		if (!ret)
-		{
-			pass++;
-		}
-		else
-		{
-			IPAERR("ipa_nat_test00%d Fail\n", exec);
-		}
-		exec++;
-
-		IPADBG("\n\nExecuting ipa_nat_test00%d\n", exec);
-		ret = ipa_nat_test007(total_entries, tbl_hdl, sep);
-		if (!ret)
-		{
-			pass++;
-		}
-		else
-		{
-			IPAERR("ipa_nat_test00%d Fail\n", exec);
-		}
-		exec++;
-
-		IPADBG("\n\nExecuting ipa_nat_test00%d\n", exec);
-		ret = ipa_nat_test008(total_entries, tbl_hdl, sep);
-		if (!ret)
-		{
-			pass++;
-		}
-		else
-		{
-			IPAERR("ipa_nat_test00%d Fail\n", exec);
-		}
-		exec++;
-
-		IPADBG("\n\nExecuting ipa_nat_test00%d\n", exec);
-		ret = ipa_nat_test009(total_entries, tbl_hdl, sep);
-		if (!ret)
-		{
-			pass++;
-		}
-		else
-		{
-			IPAERR("ipa_nat_test00%d Fail\n", exec);
-		}
-		exec++;
-
-		if (total_entries >= IPA_NAT_TEST_PRE_COND_TE)
-		{
-			IPADBG("\n\nExecuting ipa_nat_test0%d\n", exec);
-			ret = ipa_nat_test010(total_entries, tbl_hdl, sep);
-			if (!ret)
-			{
-				pass++;
-			}
-			else
-			{
-				IPAERR("ipa_nat_test0%d Fail\n", exec);
-			}
-			exec++;
-
-			IPADBG("\n\nExecuting ipa_nat_test0%d\n", exec);
-			ret = ipa_nat_test011(total_entries, tbl_hdl, sep);
-			if (!ret)
-			{
-				pass++;
-			}
-			else
-			{
-				IPAERR("ipa_nat_test0%d Fail\n", exec);
-			}
-			exec++;
-
-			IPADBG("\n\nExecuting ipa_nat_test0%d\n", exec);
-			ret = ipa_nat_test012(total_entries, tbl_hdl, sep);
-			if (!ret)
-			{
-				pass++;
-			}
-			else
-			{
-				IPAERR("ipa_nat_test0%d Fail\n", exec);
-			}
-			exec++;
-
-			IPADBG("\n\nExecuting ipa_nat_test0%d\n", exec);
-			ret = ipa_nat_test013(total_entries, tbl_hdl, sep);
-			if (!ret)
-			{
-				pass++;
-			}
-			else
-			{
-				IPAERR("ipa_nat_test0%d Fail\n", exec);
-			}
-			exec++;
-
-			IPADBG("\n\nExecuting ipa_nat_test0%d\n", exec);
-			ret = ipa_nat_test014(total_entries, tbl_hdl, sep);
-			if (!ret)
-			{
-				pass++;
-			}
-			else
-			{
-				IPAERR("ipa_nat_test0%d Fail\n", exec);
-			}
-			exec++;
-
-			IPADBG("\n\nExecuting ipa_nat_test0%d\n", exec);
-			ret = ipa_nat_test015(total_entries, tbl_hdl, sep);
-			if (!ret)
-			{
-				pass++;
-			}
-			else
-			{
-				IPAERR("ipa_nat_test0%d Fail\n", exec);
-			}
-			exec++;
-
-			IPADBG("\n\nExecuting ipa_nat_test0%d\n", exec);
-			ret = ipa_nat_test016(total_entries, tbl_hdl, sep);
-			if (!ret)
-			{
-				pass++;
-			}
-			else
-			{
-				IPAERR("ipa_nat_test0%d Fail\n", exec);
-			}
-			exec++;
-
-			IPADBG("\n\nExecuting ipa_nat_test0%d\n", exec);
-			ret = ipa_nat_test017(total_entries, tbl_hdl, sep);
-			if (!ret)
-			{
-				pass++;
-			}
-			else
-			{
-				IPAERR("ipa_nat_test0%d Fail\n", exec);
-			}
-			exec++;
-
-			IPADBG("\n\nExecuting ipa_nat_test0%d\n", exec);
-			ret = ipa_nat_test018(total_entries, tbl_hdl, sep);
-			if (!ret)
-			{
-				pass++;
-			}
-			else
-			{
-				IPAERR("ipa_nat_test0%d Fail\n", exec);
-			}
-			exec++;
-
-			IPADBG("\n\nExecuting ipa_nat_test0%d\n", exec);
-			ret = ipa_nat_test019(total_entries, tbl_hdl, sep);
-			if (!ret)
-			{
-				pass++;
-			}
-			else
-			{
-				IPAERR("ipa_nat_test0%d Fail\n", exec);
-			}
-			exec++;
-
-			IPADBG("\n\nExecuting ipa_nat_test0%d\n", exec);
-			ret = ipa_nat_test020(total_entries, tbl_hdl, sep);
-			if (!ret)
-			{
-				pass++;
-			}
-			else
-			{
-				IPAERR("ipa_nat_test0%d Fail\n", exec);
-			}
-			exec++;
-
-			IPADBG("\n\nExecuting ipa_nat_test0%d\n", exec);
-			ret = ipa_nat_test022(total_entries, tbl_hdl, sep);
-			if (!ret)
-			{
-				pass++;
-			}
-			else
-			{
-				IPAERR("ipa_nat_test0%d Fail\n", exec);
-			}
-			exec++;
-		}
-
-		if (!sep)
-		{
-			ret = ipa_nat_del_ipv4_tbl(tbl_hdl);
-			CHECK_ERR(ret);
-		}
-	}
-	/*=======  Printing Results ==========*/
-	IPADBG("Total ipa_nat Tests Run:%d, Pass:%d, Fail:%d\n",exec, pass, exec-pass);
 	return 0;
 }

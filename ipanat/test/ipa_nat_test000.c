@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2020 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -35,35 +35,36 @@
 	@brief
 	Verify the following scenario:
 	1. Add ipv4 table
-	2. Delete ipv4 table
 */
 /*===========================================================================*/
 
 #include "ipa_nat_test.h"
-#include "ipa_nat_drv.h"
 
-int ipa_nat_test000(int total_entries, u32 tbl_hdl, u8 sep)
+int ipa_nat_test000(
+	const char* nat_mem_type,
+	u32  pub_ip_add,
+	int total_entries,
+	u32 tbl_hdl,
+	int sep,
+	void* arb_data_ptr)
 {
+	int* tbl_hdl_ptr = (int*) arb_data_ptr;
 
-	int ret;
-	u32 pub_ip_add = 0x011617c0;   /* "192.23.22.1" */
+	int  ret;
 
-	ret = ipa_nat_add_ipv4_tbl(pub_ip_add, total_entries, &tbl_hdl);
-	if (0 != ret)
+	IPADBG("In\n");
+
+	if ( ! sep )
 	{
-		IPAERR("unable to create ipv4 nat table and returning Error:%d\n", ret);
-		return -1;
-	}
-	IPADBG("create nat ipv4 table successfully() \n");
+		IPADBG("calling ipa_nat_add_ipv4_tbl()\n");
 
-	IPADBG("calling ipa_nat_del_ipv4_tbl() \n");
-	ret = ipa_nat_del_ipv4_tbl(tbl_hdl);
-	if (0 != ret)
-	{
-		IPAERR("Unable to delete ipv4 nat table %d\n", ret);
-		return -1;
+		ret = ipa_nat_add_ipv4_tbl(pub_ip_add, nat_mem_type, total_entries, tbl_hdl_ptr);
+		CHECK_ERR_TBL_STOP(ret, *tbl_hdl_ptr);
+
+		IPADBG("create nat ipv4 table successfully()\n");
 	}
-	IPADBG("deleted ipv4 nat table successfully. Test passed \n");
+
+	IPADBG("Out\n");
 
 	return 0;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2018-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2019-2020 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -30,19 +30,18 @@
 /*=========================================================================*/
 /*!
 	@file
-	ipa_nat_test001.c
+	ipa_nat_testREG.c
 
 	@brief
 	Verify the following scenario:
 	1. Add ipv4 table
-	2. Add ipv4 rule
-	3. Delete ipv4 table
+	2. Delete ipv4 table
 */
-/*===========================================================================*/
+/*=========================================================================*/
 
 #include "ipa_nat_test.h"
 
-int ipa_nat_test001(
+int ipa_nat_testREG(
 	const char* nat_mem_type,
 	u32 pub_ip_add,
 	int total_entries,
@@ -50,37 +49,34 @@ int ipa_nat_test001(
 	int sep,
 	void* arb_data_ptr)
 {
-	int* tbl_hdl_ptr = (int*) arb_data_ptr;
-	int ret;
-	u32 rule_hdl;
-	ipa_nat_ipv4_rule ipv4_rule = {0};
+	int* ireg_ptr = (int*) arb_data_ptr;
 
-	ipv4_rule.target_ip = RAN_ADDR;
-	ipv4_rule.target_port = RAN_PORT;
-
-	ipv4_rule.private_ip = RAN_ADDR;
-	ipv4_rule.private_port = RAN_PORT;
-
-	ipv4_rule.protocol = IPPROTO_TCP;
-	ipv4_rule.public_port = RAN_PORT;
+	int  i, ret;
 
 	IPADBG("In\n");
 
-	if ( sep )
+	for ( i = 0; i < *ireg_ptr; i++ )
 	{
+		IPADBG("Executing iteration %d\n", i+1);
+
+		IPADBG("Calling ipa_nat_add_ipv4_tbl()\n");
+
 		ret = ipa_nat_add_ipv4_tbl(pub_ip_add, nat_mem_type, total_entries, &tbl_hdl);
+
 		CHECK_ERR_TBL_STOP(ret, tbl_hdl);
-	}
 
-	ret = ipa_nat_add_ipv4_rule(tbl_hdl, &ipv4_rule, &rule_hdl);
-	CHECK_ERR_TBL_STOP(ret, tbl_hdl);
+		IPADBG("Iteration %d creation of nat ipv4 table successful\n", i+1);
 
-	if ( sep )
-	{
+		IPADBG("Calling ipa_nat_del_ipv4_tbl()\n");
+
 		ret = ipa_nat_del_ipv4_tbl(tbl_hdl);
-		*tbl_hdl_ptr = 0;
+
 		CHECK_ERR(ret);
+
+		IPADBG("Iteration %d deletion of ipv4 nat table successful\n", i+1);
 	}
+
+	IPADBG("Executed %d iterations:\n", i);
 
 	IPADBG("Out\n");
 

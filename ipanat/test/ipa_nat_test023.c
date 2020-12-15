@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2018-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2019-2020 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -30,19 +30,23 @@
 /*=========================================================================*/
 /*!
 	@file
-	ipa_nat_test001.c
+	ipa_nat_test023.c
 
 	@brief
 	Verify the following scenario:
 	1. Add ipv4 table
-	2. Add ipv4 rule
-	3. Delete ipv4 table
+	2. Add ipv rule three times to cause collisions and linking
+	3. Delete rules in a particular order and observe list for expected
+	   form
+	4. Run 2 and 3 over and over until all delete cominations have been
+	   run
+	5. Delete ipv4 table
 */
-/*===========================================================================*/
+/*=========================================================================*/
 
 #include "ipa_nat_test.h"
 
-int ipa_nat_test001(
+int ipa_nat_test023(
 	const char* nat_mem_type,
 	u32 pub_ip_add,
 	int total_entries,
@@ -51,18 +55,32 @@ int ipa_nat_test001(
 	void* arb_data_ptr)
 {
 	int* tbl_hdl_ptr = (int*) arb_data_ptr;
-	int ret;
-	u32 rule_hdl;
+
 	ipa_nat_ipv4_rule ipv4_rule = {0};
 
-	ipv4_rule.target_ip = RAN_ADDR;
-	ipv4_rule.target_port = RAN_PORT;
+	u32 rule_hdl1;
+	u32 rule_hdl2;
+	u32 rule_hdl3;
 
-	ipv4_rule.private_ip = RAN_ADDR;
+	u32* rule_del_combos[6][3] = {
+		{ &rule_hdl1, &rule_hdl2, &rule_hdl3 },
+		{ &rule_hdl1, &rule_hdl3, &rule_hdl2 },
+
+		{ &rule_hdl2, &rule_hdl1, &rule_hdl3 },
+		{ &rule_hdl2, &rule_hdl3, &rule_hdl1 },
+
+		{ &rule_hdl3, &rule_hdl1, &rule_hdl2 },
+		{ &rule_hdl3, &rule_hdl2, &rule_hdl1 },
+	};
+
+	int i, j, ret;
+
+	ipv4_rule.target_ip    = RAN_ADDR;
+	ipv4_rule.target_port  = RAN_PORT;
+	ipv4_rule.private_ip   = RAN_ADDR;
 	ipv4_rule.private_port = RAN_PORT;
-
-	ipv4_rule.protocol = IPPROTO_TCP;
-	ipv4_rule.public_port = RAN_PORT;
+	ipv4_rule.protocol     = IPPROTO_TCP;
+	ipv4_rule.public_port  = RAN_PORT;
 
 	IPADBG("In\n");
 
@@ -72,8 +90,36 @@ int ipa_nat_test001(
 		CHECK_ERR_TBL_STOP(ret, tbl_hdl);
 	}
 
-	ret = ipa_nat_add_ipv4_rule(tbl_hdl, &ipv4_rule, &rule_hdl);
-	CHECK_ERR_TBL_STOP(ret, tbl_hdl);
+	for ( i = 0; i < 6; i++ )
+	{
+		IPADBG("Adding rule 1\n");
+		ret = ipa_nat_add_ipv4_rule(tbl_hdl, &ipv4_rule, &rule_hdl1);
+		CHECK_ERR_TBL_STOP(ret, tbl_hdl);
+
+		IPADBG("Adding rule 2\n");
+		ret = ipa_nat_add_ipv4_rule(tbl_hdl, &ipv4_rule, &rule_hdl2);
+		CHECK_ERR_TBL_STOP(ret, tbl_hdl);
+
+		IPADBG("Adding rule 3\n");
+		ret = ipa_nat_add_ipv4_rule(tbl_hdl, &ipv4_rule, &rule_hdl3);
+		CHECK_ERR_TBL_STOP(ret, tbl_hdl);
+
+		ipa_nat_dump_ipv4_table(tbl_hdl);
+
+		for ( j = 0; j < 3; j++ )
+		{
+			u32* rh_ptr = rule_del_combos[i][j];
+
+			IPADBG("Deleting rule %u\n",
+				   ( rh_ptr == &rule_hdl1 ) ? 1 :
+				   ( rh_ptr == &rule_hdl2 ) ? 2 : 3);
+
+			ret = ipa_nat_del_ipv4_rule(tbl_hdl, *rh_ptr);
+			CHECK_ERR_TBL_STOP(ret, tbl_hdl);
+
+			ipa_nat_dump_ipv4_table(tbl_hdl);
+		}
+	}
 
 	if ( sep )
 	{

@@ -2,9 +2,11 @@ AM_CPPFLAGS = -I./../inc \
 	      -I$(top_srcdir)/ipanat/inc
 
 AM_CPPFLAGS += -Wall -Wundef -Wno-trigraphs
-AM_CPPFLAGS += -g
+AM_CPPFLAGS += -g -DDEBUG -DNAT_DEBUG
 
-ipanattest_SOURCES = ipa_nat_test000.c \
+ipanattest_SOURCES = \
+		ipa_nat_testREG.c \
+		ipa_nat_test000.c \
 		ipa_nat_test001.c \
 		ipa_nat_test002.c \
 		ipa_nat_test003.c \
@@ -27,8 +29,11 @@ ipanattest_SOURCES = ipa_nat_test000.c \
 		ipa_nat_test020.c \
 		ipa_nat_test021.c \
 		ipa_nat_test022.c \
+		ipa_nat_test023.c \
+		ipa_nat_test024.c \
+		ipa_nat_test025.c \
+		ipa_nat_test999.c \
 		main.c
-
 
 bin_PROGRAMS  =  ipanattest
 
@@ -39,4 +44,3 @@ ipanattest_LDADD =  $(requiredlibs)
 LOCAL_MODULE := libipanat
 LOCAL_PRELINK_MODULE := false
 include $(BUILD_SHARED_LIBRARY)
-

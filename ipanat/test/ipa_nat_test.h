@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014, 2018-2020 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -27,78 +27,154 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/*===========================================================================
-
-                     INCLUDE FILES FOR MODULE
-
-===========================================================================*/
-#include "stdint.h"  /* uint32_t */
-#include "stdio.h"
+/*
+ * ===========================================================================
+ *
+ * INCLUDE FILES FOR MODULE
+ *
+ * ===========================================================================
+ */
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <time.h>
 #include <netinet/in.h> /* for proto definitions */
+
+#include "ipa_nat_drv.h"
+#include "ipa_nat_drvi.h"
+
+#undef array_sz
+#define array_sz(a) \
+	( sizeof(a)/sizeof(a[0]) )
 
 #define u32 uint32_t
 #define u16 uint16_t
 #define u8  uint8_t
 
+#define RAN_ADDR rand_ip_addr()
+#define RAN_PORT rand_ip_port()
+
+static inline u32 rand_ip_addr()
+{
+	static char buf[64];
+
+	snprintf(
+		buf, sizeof(buf),
+		"%u.%u.%u.%u",
+		(rand() % 254) + 1,
+		 rand() % 255,
+		 rand() % 255,
+		(rand() % 254) + 1);
+
+	return (u32) inet_addr(buf);
+}
+
+static inline u16 rand_ip_port()
+{
+	return (u16) ((rand() % 60535) + 5000);
+}
+
 /*============ Preconditions to run NAT Test cases =========*/
 #define IPA_NAT_TEST_PRE_COND_TE  20
 
-#define CHECK_ERR1(x, tbl_hdl) \
-  if(ipa_nat_validate_ipv4_table(tbl_hdl)) { \
-    if(sep) {\
-       ipa_nat_del_ipv4_tbl(tbl_hdl); \
-     }\
-    return -1;\
-  }\
-  if(x) { \
-    IPAERR("%d\n", ret); \
-    if(sep) {\
-      ipa_nat_del_ipv4_tbl(tbl_hdl); \
-     }\
-     return -1; \
-  }
+#define CHECK_ERR(x)							\
+	if ( x ) {									\
+		IPAERR("Abrupt end of %s with "			\
+			   "err: %d at line: %d\n",			\
+			   __FUNCTION__, x, __LINE__);		\
+		return -1;								\
+	}
 
-#define CHECK_ERR(x) if(x) { \
-    IPAERR("%d\n", ret); \
-    return -1;\
- }
+#define CHECK_ERR_TBL_STOP(x, th)									 \
+	if ( th ) {														 \
+		int _ter_ = ipa_nat_validate_ipv4_table(th);				 \
+		if ( _ter_ ) {												 \
+			if ( sep ) {											 \
+				ipa_nat_del_ipv4_tbl(th);							 \
+			}														 \
+			IPAERR("Abrupt end of %s with "							 \
+				   "err: %d at line: %d\n",							 \
+				   __FUNCTION__, _ter_, __LINE__);					 \
+			return -1;												 \
+		}															 \
+	}																 \
+	if ( x ) {														 \
+		if ( th ) {													 \
+			ipa_nat_dump_ipv4_table(th);							 \
+			if( sep ) {												 \
+				ipa_nat_del_ipv4_tbl(th);							 \
+			}														 \
+		}															 \
+		IPAERR("Abrupt end of %s with "								 \
+			   "err: %d at line: %d\n",								 \
+			   __FUNCTION__, x, __LINE__);							 \
+		return -1;													 \
+	}
 
-#if 0
-#define CHECK_ERR(x) if(x) { \
-    IPAERR("%d\n", ret); \
-    if(sep) {\
-      ipa_nat_del_ipv4_tbl(tbl_hdl); \
-    }\
-    return -1;\
- }
-#endif
+#define CHECK_ERR_TBL_ACTION(x, th, action)							 \
+	if ( th ) {														 \
+		int _ter_ = ipa_nat_validate_ipv4_table(th);				 \
+		if ( _ter_ ) {												 \
+			IPAERR("ipa_nat_validate_ipv4_table() failed "			 \
+				   "in: %s at line: %d\n",							 \
+				   __FUNCTION__, __LINE__);							 \
+			action;													 \
+		}															 \
+	}																 \
+	if ( x ) {														 \
+		if ( th ) {													 \
+			ipa_nat_dump_ipv4_table(th);							 \
+		}															 \
+		IPAERR("error: %d in %s at line: %d\n",						 \
+			   x, __FUNCTION__, __LINE__);							 \
+		action;														 \
+	}
 
-#define IPADBG(fmt, args...) printf(" %s:%d " fmt, __FUNCTION__, __LINE__, ## args)
-#define IPAERR(fmt, args...) printf(" %s:%d " fmt, __FUNCTION__, __LINE__, ## args)
+typedef int (*NatTestFunc)(
+	const char*, u32, int, u32, int, void*);
 
-#define NAT_DUMP
+typedef struct
+{
+	const char* func_name;
+	int         num_ents_trigger;
+	int         test_hold_time_in_secs;
+	NatTestFunc func;
+} NatTests;
+
+#undef NAT_TEST_ENTRY
+#define NAT_TEST_ENTRY(f, n, ht) \
+	{#f, (n), (ht), f}
+
+#define NAT_DEBUG
 int ipa_nat_validate_ipv4_table(u32);
 
-int ipa_nat_test000(int, u32, u8);
-int ipa_nat_test001(int, u32, u8);
-int ipa_nat_test002(int, u32, u8);
-int ipa_nat_test003(int, u32, u8);
-int ipa_nat_test004(int, u32, u8);
-int ipa_nat_test005(int, u32, u8);
-int ipa_nat_test006(int, u32, u8);
-int ipa_nat_test007(int, u32, u8);
-int ipa_nat_test008(int, u32, u8);
-int ipa_nat_test009(int, u32, u8);
-int ipa_nat_test010(int, u32, u8);
-int ipa_nat_test011(int, u32, u8);
-int ipa_nat_test012(int, u32, u8);
-int ipa_nat_test013(int, u32, u8);
-int ipa_nat_test014(int, u32, u8);
-int ipa_nat_test015(int, u32, u8);
-int ipa_nat_test016(int, u32, u8);
-int ipa_nat_test017(int, u32, u8);
-int ipa_nat_test018(int, u32, u8);
-int ipa_nat_test019(int, u32, u8);
-int ipa_nat_test020(int, u32, u8);
-int ipa_nat_test021(int, int);
-int ipa_nat_test022(int, u32, u8);
+int ipa_nat_testREG(const char*, u32, int, u32, int, void*);
+
+int ipa_nat_test000(const char*, u32, int, u32, int, void*);
+int ipa_nat_test001(const char*, u32, int, u32, int, void*);
+int ipa_nat_test002(const char*, u32, int, u32, int, void*);
+int ipa_nat_test003(const char*, u32, int, u32, int, void*);
+int ipa_nat_test004(const char*, u32, int, u32, int, void*);
+int ipa_nat_test005(const char*, u32, int, u32, int, void*);
+int ipa_nat_test006(const char*, u32, int, u32, int, void*);
+int ipa_nat_test007(const char*, u32, int, u32, int, void*);
+int ipa_nat_test008(const char*, u32, int, u32, int, void*);
+int ipa_nat_test009(const char*, u32, int, u32, int, void*);
+int ipa_nat_test010(const char*, u32, int, u32, int, void*);
+int ipa_nat_test011(const char*, u32, int, u32, int, void*);
+int ipa_nat_test012(const char*, u32, int, u32, int, void*);
+int ipa_nat_test013(const char*, u32, int, u32, int, void*);
+int ipa_nat_test014(const char*, u32, int, u32, int, void*);
+int ipa_nat_test015(const char*, u32, int, u32, int, void*);
+int ipa_nat_test016(const char*, u32, int, u32, int, void*);
+int ipa_nat_test017(const char*, u32, int, u32, int, void*);
+int ipa_nat_test018(const char*, u32, int, u32, int, void*);
+int ipa_nat_test019(const char*, u32, int, u32, int, void*);
+int ipa_nat_test020(const char*, u32, int, u32, int, void*);
+int ipa_nat_test021(const char*, u32, int, u32, int, void*);
+int ipa_nat_test022(const char*, u32, int, u32, int, void*);
+int ipa_nat_test023(const char*, u32, int, u32, int, void*);
+int ipa_nat_test024(const char*, u32, int, u32, int, void*);
+int ipa_nat_test025(const char*, u32, int, u32, int, void*);
+int ipa_nat_test999(const char*, u32, int, u32, int, void*);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2020 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -27,55 +27,99 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+
 /*=========================================================================*/
 /*!
 	@file
-	ipa_nat_test021.c
+	ipa_nat_test021.cpp
 
 	@brief
 	Verify the following scenario:
 	1. Add ipv4 table
-	2. Delete ipv4 table
+	2. add same 3 ipv rules
+	3. delete Head and last entry
+	4. add 2 new same ip4 entries
+	5. Add head entry again
+	6. Delete ipv4 table
 */
 /*=========================================================================*/
 
 #include "ipa_nat_test.h"
-#include "ipa_nat_drv.h"
 
-int ipa_nat_test021(int total_entries, int reg)
+int ipa_nat_test021(
+	const char* nat_mem_type,
+	u32 pub_ip_add,
+	int total_entries,
+	u32 tbl_hdl,
+	int sep,
+	void* arb_data_ptr)
 {
+	int* tbl_hdl_ptr = (int*) arb_data_ptr;
+	int ret;
+	u32 rule_hdl1, rule_hdl2, rule_hdl3;
+	ipa_nat_ipv4_rule ipv4_rule = {0}, ipv4_rule2 = {0};
+	u32 rule_hdl21, rule_hdl22;
 
-	int ret, i;
-	u32 tbl_hdl;
-	u32 pub_ip_add = 0x011617c0;   /* "192.23.22.1" */
+	/* Rule 1 */
+	ipv4_rule.target_ip = RAN_ADDR;
+	ipv4_rule.target_port = RAN_PORT;
+	ipv4_rule.private_ip = RAN_ADDR;
+	ipv4_rule.private_port = RAN_PORT;
+	ipv4_rule.protocol = IPPROTO_TCP;
+	ipv4_rule.public_port = RAN_PORT;
 
-	IPADBG("%s():\n",__FUNCTION__);
+	/* Rule 2*/
+	ipv4_rule.target_ip = RAN_ADDR;
+	ipv4_rule.target_port = RAN_PORT;
+	ipv4_rule.private_ip = RAN_ADDR;
+	ipv4_rule.private_port = RAN_PORT;
+	ipv4_rule.protocol = IPPROTO_UDP;
+	ipv4_rule.public_port = RAN_PORT;
 
-	for(i=0; i<reg; i++)
+	IPADBG("In\n");
+
+	if ( sep )
 	{
-		IPADBG("executing %d th time:\n",i);
-
-		IPADBG("calling ipa_nat_add_ipv4_tbl() \n");
-		ret = ipa_nat_add_ipv4_tbl(pub_ip_add, total_entries, &tbl_hdl);
-		if (0 != ret)
-		{
-			IPAERR("unable to create ipv4 nat table and returning Error:%d\n", ret);
-			IPADBG("executed %d times:\n",i);
-			return -1;
-		}
-		IPADBG("create nat ipv4 table successfully() \n");
-
-		IPADBG("calling ipa_nat_del_ipv4_tbl() \n");
-		ret = ipa_nat_del_ipv4_tbl(tbl_hdl);
-		if (0 != ret)
-		{
-			IPAERR("Unable to delete ipv4 nat table %d\n", ret);
-			IPADBG("executed %d times:\n",i);
-			return -1;
-		}
-		IPADBG("deleted ipv4 nat table successfully. Test passed \n");
+		ret = ipa_nat_add_ipv4_tbl(pub_ip_add, nat_mem_type, total_entries, &tbl_hdl);
+		CHECK_ERR_TBL_STOP(ret, tbl_hdl);
 	}
 
-	IPADBG("executed %d times:\n",(i+1));
+	ret = ipa_nat_add_ipv4_rule(tbl_hdl, &ipv4_rule, &rule_hdl1);
+	CHECK_ERR_TBL_STOP(ret, tbl_hdl);
+
+	ret = ipa_nat_add_ipv4_rule(tbl_hdl, &ipv4_rule, &rule_hdl2);
+	CHECK_ERR_TBL_STOP(ret, tbl_hdl);
+
+	ret = ipa_nat_add_ipv4_rule(tbl_hdl, &ipv4_rule, &rule_hdl3);
+	CHECK_ERR_TBL_STOP(ret, tbl_hdl);
+
+	/* Delete head entry */
+	ret = ipa_nat_del_ipv4_rule(tbl_hdl, rule_hdl1);
+	CHECK_ERR_TBL_STOP(ret, tbl_hdl);
+
+	/* Delete Last Entry */
+	ret = ipa_nat_del_ipv4_rule(tbl_hdl, rule_hdl3);
+	CHECK_ERR_TBL_STOP(ret, tbl_hdl);
+
+	/* Add 2 different Entries */
+	ret = ipa_nat_add_ipv4_rule(tbl_hdl, &ipv4_rule2, &rule_hdl21);
+	CHECK_ERR_TBL_STOP(ret, tbl_hdl);
+
+	ret = ipa_nat_add_ipv4_rule(tbl_hdl, &ipv4_rule2, &rule_hdl22);
+	CHECK_ERR_TBL_STOP(ret, tbl_hdl);
+
+	/* Add first entry again */
+	ret = ipa_nat_add_ipv4_rule(tbl_hdl, &ipv4_rule, &rule_hdl3);
+	CHECK_ERR_TBL_STOP(ret, tbl_hdl);
+
+	if ( sep )
+	{
+		ret = ipa_nat_del_ipv4_tbl(tbl_hdl);
+		*tbl_hdl_ptr = 0;
+		CHECK_ERR(ret);
+	}
+
+	IPADBG("Out\n");
+
 	return 0;
 }

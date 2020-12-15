@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2013-2019, The Linux Foundation. All rights reserved.
+Copyright (c) 2013-2020, The Linux Foundation. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -109,6 +109,7 @@ public:
 
 	int ipa_num_alg_ports;
 
+	const char* ipa_nat_memtype;
 	int ipa_nat_max_entries;
 
 	bool ipacm_odu_router_mode;
@@ -226,6 +227,11 @@ public:
 		return ipa_nat_max_entries;
 	}
 
+	inline const char* GetNatMemType(void)
+	{
+		return ipa_nat_memtype;
+	}
+
 	inline int GetNatIfacesCnt()
 	{
 		return ipa_nat_iface_entries;
@@ -260,6 +266,8 @@ public:
 	int DelExtProp(ipa_ip_type ip_type);
 
 	enum ipa_hw_type GetIPAVer(bool get = false);
+
+	int ResetClkVote(void);
 
 	bool isEthBridgingSupported();
 
@@ -360,6 +368,10 @@ public:
 	static const char *DEVICE_NAME_ODU;
 
 private:
+
+	static const int DEFAULT_IPV6CT_MAX_ENTRIES = 500;
+	const char* DEFAULT_NAT_MEMTYPE = "DDR";
+
 	enum ipa_hw_type ver;
 	static IPACM_Config *pInstance;
 	static const char *DEVICE_NAME;

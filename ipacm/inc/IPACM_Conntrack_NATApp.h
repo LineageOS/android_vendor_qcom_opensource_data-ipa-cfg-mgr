@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2013-2019, The Linux Foundation. All rights reserved.
+Copyright (c) 2013-2020, The Linux Foundation. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -86,6 +86,8 @@ private:
 	uint8_t pub_mux_id;
 
 	int curCnt, max_entries;
+
+	const char* mem_type;
 
 	ipacm_alg *pALGPorts;
 	uint16_t nALGPort;

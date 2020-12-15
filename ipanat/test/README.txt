@@ -1,18 +1,66 @@
-1 To run this suite separately(each test case creates table and delete table) use below command
-   - To execute test suite nt times with n entries, command "ipanatest sep nt n"
+INTRODUCTION
+------------
 
-  Example:  To execute test suite 1 time with 100 entries, command "ipanattest sep 100"
+The ipanattest allow its user to drive NAT testing.  It is run thusly:
 
+# ipanattest [-d -r N -i N -e N -m mt]
+Where:
+  -d     Each test is discrete (create table, add rules, destroy table)
+         If not specified, only one table create and destroy for all tests
+  -r N   Where N is the number of times to run the inotify regression test
+  -i N   Where N is the number of times (iterations) to run test
+  -e N   Where N is the number of entries in the NAT
+  -m mt  Where mt is the type of memory to use for the NAT
+         Legal mt's: DDR, SRAM, or HYBRID (ie. use SRAM and DDR)
+  -g M-N Run tests M through N only
 
-2. To run test suite not separately(creates table and delete table only once) use below command
-   - To execute test suite nt times with n entries, command "ipanatest reg nt n"
+More about each command line option:
 
-   Example: To execute test suite 5 times with 32 entries, command "ipanattest reg 5 32"
+-d    Makes each test discrete; meaning that, each test will create a
+      table, add rules, then destory the table.
 
+      Conversely, when -d not specified, each test will not create
+      and destroy a table.  Only one table create and destroy at the
+      start and end of the run...with all test being run in between.
 
-3. To run inotify regression test use command, "ipanattest inotify nt"
+-r N  Will cause the inotify regression test to be run N times.
 
-   Example: To execute inotify 5 times, command "ipanattest inotify 5"
+-i N  Will cause each test to be run N times
 
+-e N  Will cause the creation of a table with N entries
 
-4. if we just give command "ipanattest", runs test suite 1 time with 100 entries (non separate)
+-m mt Will cause the NAT to live in either SRAM, DDR, or both
+      (ie. HYBRID)
+
+-g M-N Will cause test M to N to be run. This allows you to skip
+       or isolate tests
+
+When run with no arguments (ie. defaults):
+
+  1) The tests will be non-discrete
+  2) With only one iteration of the tests
+  3) On a DDR based table with one hundred entries
+  4) No inotify regression will be run
+
+EXAMPLE COMMAND LINES
+---------------------
+
+To execute discrete tests (create, add rules, and delete table for
+each test) one time on a table with one hundred entries:
+
+# ipanattest -d -i 1 -e 100
+
+To execute non-discrete (create and delete table only once) tests five
+times on a table with thirty-two entries:
+
+# ipanattest -i 5 -e 32
+
+To execute inotify regression test 5 times
+
+# ipanattest -r 5
+
+ADDING NEW TESTS
+----------------
+
+In main.c, please see and embellish nt_array[] and use the following
+file as a model: ipa_nat_testMODEL.c

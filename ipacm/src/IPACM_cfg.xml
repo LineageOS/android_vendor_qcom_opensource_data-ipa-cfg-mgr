@@ -175,6 +175,7 @@
 		</IPACMALG>
 		<IPACMNAT>		
  	        <MaxNatEntries>500</MaxNatEntries>
+ 	        <NatTableType>HYBRID</NatTableType>
 		</IPACMNAT>
 		</IPACM>
 </system>

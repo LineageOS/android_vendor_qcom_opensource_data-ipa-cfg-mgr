@@ -14,7 +14,9 @@ LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
 LOCAL_ADDITIONAL_DEPENDENCIES := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
 
 LOCAL_MODULE := ipa_nat_test
-LOCAL_SRC_FILES := ipa_nat_test000.c \
+LOCAL_SRC_FILES := \
+		ipa_nat_testREG.c \
+		ipa_nat_test000.c \
 		ipa_nat_test001.c \
 		ipa_nat_test002.c \
 		ipa_nat_test003.c \
@@ -37,8 +39,11 @@ LOCAL_SRC_FILES := ipa_nat_test000.c \
 		ipa_nat_test020.c \
 		ipa_nat_test021.c \
 		ipa_nat_test022.c \
+		ipa_nat_test023.c \
+		ipa_nat_test024.c \
+		ipa_nat_test025.c \
+		ipa_nat_test999.c \
 		main.c
-
 
 LOCAL_SHARED_LIBRARIES := libipanat
 

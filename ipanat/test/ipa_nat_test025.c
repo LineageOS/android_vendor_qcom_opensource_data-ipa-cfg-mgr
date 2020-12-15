@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2018-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2019-2020 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -30,20 +30,28 @@
 /*=========================================================================*/
 /*!
 	@file
-	ipa_nat_test022.c
+	ipa_nat_test025.c
 
 	@brief
 	Note: Verify the following scenario:
-	1. Add ipv4 table
-	2. Add ipv4 rules till filled
-	3. Print stats
-	4. Delete ipv4 table
+	1. Similare to test022, but with random deletes during adds
 */
 /*=========================================================================*/
 
 #include "ipa_nat_test.h"
 
-int ipa_nat_test022(
+#undef  VALID_RULE
+#define VALID_RULE(r) ((r) != 0 && (r) != 0xFFFFFFFF)
+
+#undef GET_MAX
+#define GET_MAX(ram, rdm) \
+	do { \
+		while ( (ram = rand() % 20) < 4); \
+		while ( (rdm = rand() % 10) >= ram || rdm == 0 ); \
+		IPADBG("rand_adds_max(%u) rand_dels_max(%u)\n", ram, rdm); \
+	} while (0)
+
+int ipa_nat_test025(
 	const char* nat_mem_type,
 	u32 pub_ip_add,
 	int total_entries,
@@ -54,12 +62,14 @@ int ipa_nat_test022(
 	int* tbl_hdl_ptr = (int*) arb_data_ptr;
 
 	ipa_nat_ipv4_rule  ipv4_rule;
-	u32                rule_hdls[2048];
+	u32                rule_hdls[1024];
 
 	ipa_nati_tbl_stats nstats, last_nstats;
 	ipa_nati_tbl_stats istats, last_istats;
 
-	u32                i, tot;
+	u32                i;
+	u32                rand_adds_max, rand_dels_max;
+	u32                tot, tot_added, tot_deleted;
 
 	bool               switched = false;
 
@@ -90,9 +100,13 @@ int ipa_nat_test022(
 
 	memset(rule_hdls, 0, sizeof(rule_hdls));
 
-	for ( i = tot = 0; i < array_sz(rule_hdls); i++ )
+	GET_MAX(rand_adds_max, rand_dels_max);
+
+	tot = tot_added = tot_deleted = 0;
+
+	for ( i = 0; i < array_sz(rule_hdls); i++ )
 	{
-		IPADBG("Trying %d ipa_nat_add_ipv4_rule()\n", i);
+		IPADBG("Trying %u ipa_nat_add_ipv4_rule()\n", i);
 
 		memset(&ipv4_rule, 0, sizeof(ipv4_rule));
 
@@ -106,7 +120,7 @@ int ipa_nat_test022(
 		ret = ipa_nat_add_ipv4_rule(tbl_hdl, &ipv4_rule, &rule_hdls[i]);
 		CHECK_ERR_TBL_ACTION(ret, tbl_hdl, break);
 
-		IPADBG("Success %d ipa_nat_add_ipv4_rule() -> rule_hdl(0x%08X)\n",
+		IPADBG("Success %u ipa_nat_add_ipv4_rule() -> rule_hdl(0x%08X)\n",
 			   i, rule_hdls[i]);
 
 		ret = ipa_nati_ipv4_tbl_stats(tbl_hdl, &nstats, &istats);
@@ -192,6 +206,54 @@ int ipa_nat_test022(
 		last_nstats = nstats;
 		last_istats = istats;
 
+		tot++;
+
+		if ( ++tot_added == rand_adds_max )
+		{
+			u32  j, k;
+			u32* hdl_ptr[tot];
+
+			for ( j = k = 0; j < array_sz(rule_hdls); j++ )
+			{
+				if ( VALID_RULE(rule_hdls[j]) )
+				{
+					hdl_ptr[k] = &(rule_hdls[j]);
+
+					if ( ++k == tot )
+					{
+						break;
+					}
+				}
+			}
+
+			IPADBG("About to delete %u rules\n", rand_dels_max);
+
+			while ( k )
+			{
+				while ( j = rand() % k, ! VALID_RULE(*(hdl_ptr[j])) );
+
+				IPADBG("Trying ipa_nat_del_ipv4_rule(0x%08X)\n",
+					   *(hdl_ptr[j]));
+
+				ret = ipa_nat_del_ipv4_rule(tbl_hdl, *(hdl_ptr[j]));
+				CHECK_ERR_TBL_STOP(ret, tbl_hdl);
+				IPADBG("Success ipa_nat_del_ipv4_rule(0x%08X)\n", *(hdl_ptr[j]));
+
+				*(hdl_ptr[j]) = 0xFFFFFFFF;
+
+				--tot;
+
+				if ( ++tot_deleted == rand_dels_max )
+				{
+					break;
+				}
+			}
+
+			GET_MAX(rand_adds_max, rand_dels_max);
+
+			tot_added = tot_deleted = 0;
+		}
+
 		if ( switched )
 		{
 			switched = false;
@@ -200,8 +262,6 @@ int ipa_nat_test022(
 					ipa3_nat_mem_in_as_str(nstats.nmi),
 					nstats.tot_ents);
 		}
-
-		tot++;
 	}
 
 	ret = ipa_nati_ipv4_tbl_stats(tbl_hdl, &nstats, &istats);
@@ -275,15 +335,18 @@ int ipa_nat_test022(
 			istats.max_chain_len,
 			istats.avg_chain_len);
 
-	IPAINFO("Deleting all rules\n");
+	IPAINFO("Deleting remaining rules\n");
 
-	for ( i = 0; i < tot; i++ )
+	for ( i = 0; i < array_sz(rule_hdls); i++ )
 	{
-		IPADBG("Trying %d ipa_nat_del_ipv4_rule(0x%08X)\n",
-			   i, rule_hdls[i]);
-		ret = ipa_nat_del_ipv4_rule(tbl_hdl, rule_hdls[i]);
-		CHECK_ERR_TBL_STOP(ret, tbl_hdl);
-		IPADBG("Success ipa_nat_del_ipv4_rule(%d)\n", i);
+		if ( VALID_RULE(rule_hdls[i]) )
+		{
+			IPADBG("Trying ipa_nat_del_ipv4_rule(0x%08X)\n",
+				   rule_hdls[i]);
+			ret = ipa_nat_del_ipv4_rule(tbl_hdl, rule_hdls[i]);
+			CHECK_ERR_TBL_STOP(ret, tbl_hdl);
+			IPADBG("Success ipa_nat_del_ipv4_rule(%u)\n", rule_hdls[i]);
+		}
 	}
 
 	if ( sep )

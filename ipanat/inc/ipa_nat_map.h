@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2018-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2019-2020 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -26,63 +26,82 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#if !defined(_IPA_NATI_MAP_H_)
+# define _IPA_NATI_MAP_H_
 
-/*=========================================================================*/
-/*!
-	@file
-	ipa_nat_test001.c
+#include <stdint.h>
 
-	@brief
-	Verify the following scenario:
-	1. Add ipv4 table
-	2. Add ipv4 rule
-	3. Delete ipv4 table
-*/
-/*===========================================================================*/
-
-#include "ipa_nat_test.h"
-
-int ipa_nat_test001(
-	const char* nat_mem_type,
-	u32 pub_ip_add,
-	int total_entries,
-	u32 tbl_hdl,
-	int sep,
-	void* arb_data_ptr)
+# ifdef __cplusplus
+extern "C"
 {
-	int* tbl_hdl_ptr = (int*) arb_data_ptr;
-	int ret;
-	u32 rule_hdl;
-	ipa_nat_ipv4_rule ipv4_rule = {0};
+# endif /* __cplusplus */
 
-	ipv4_rule.target_ip = RAN_ADDR;
-	ipv4_rule.target_port = RAN_PORT;
+/* Used below */
+#define MAKE_AS_STR_CASE(v) case v: return #v
 
-	ipv4_rule.private_ip = RAN_ADDR;
-	ipv4_rule.private_port = RAN_PORT;
+/*
+ * The following is used to describe which map to use.
+ *
+ * PLEASE KEEP THE FOLLOWING IN SYNC WITH ipa_which_map_as_str()
+ * BELOW.
+ */
+typedef enum
+{
+	MAP_NUM_00 = 0,
+	MAP_NUM_01 = 1,
+	MAP_NUM_02 = 2,
+	MAP_NUM_03 = 3,
 
-	ipv4_rule.protocol = IPPROTO_TCP;
-	ipv4_rule.public_port = RAN_PORT;
+	MAP_NUM_99 = 4,
 
-	IPADBG("In\n");
+	MAP_NUM_MAX
+} ipa_which_map;
 
-	if ( sep )
+#define VALID_IPA_USE_MAP(w) \
+	( (w) >= MAP_NUM_00 || (w) < MAP_NUM_MAX )
+
+/* KEEP THE FOLLOWING IN SYNC WITH ABOVE. */
+static inline const char* ipa_which_map_as_str(
+	ipa_which_map w )
+{
+	switch ( w )
 	{
-		ret = ipa_nat_add_ipv4_tbl(pub_ip_add, nat_mem_type, total_entries, &tbl_hdl);
-		CHECK_ERR_TBL_STOP(ret, tbl_hdl);
+		MAKE_AS_STR_CASE(MAP_NUM_00);
+		MAKE_AS_STR_CASE(MAP_NUM_01);
+		MAKE_AS_STR_CASE(MAP_NUM_02);
+		MAKE_AS_STR_CASE(MAP_NUM_03);
+
+		MAKE_AS_STR_CASE(MAP_NUM_99);
+	default:
+		break;
 	}
 
-	ret = ipa_nat_add_ipv4_rule(tbl_hdl, &ipv4_rule, &rule_hdl);
-	CHECK_ERR_TBL_STOP(ret, tbl_hdl);
-
-	if ( sep )
-	{
-		ret = ipa_nat_del_ipv4_tbl(tbl_hdl);
-		*tbl_hdl_ptr = 0;
-		CHECK_ERR(ret);
-	}
-
-	IPADBG("Out\n");
-
-	return 0;
+	return "???";
 }
+
+int ipa_nat_map_add(
+	ipa_which_map which,
+	uint32_t      key,
+	uint32_t      val );
+
+int ipa_nat_map_find(
+	ipa_which_map which,
+	uint32_t      key,
+	uint32_t*     val_ptr );
+
+int ipa_nat_map_del(
+	ipa_which_map which,
+	uint32_t      key,
+	uint32_t*     val_ptr );
+
+int ipa_nat_map_clear(
+	ipa_which_map which );
+
+int ipa_nat_map_dump(
+	ipa_which_map which );
+
+# ifdef __cplusplus
+}
+# endif /* __cplusplus */
+
+#endif /* #if !defined(_IPA_NATI_MAP_H_) */

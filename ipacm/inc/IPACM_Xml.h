@@ -1,5 +1,5 @@
 /* 
-Copyright (c) 2013, The Linux Foundation. All rights reserved.
+Copyright (c) 2013-2020, The Linux Foundation. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -109,6 +109,9 @@ if (!(a)) {                                                 \
 #define Port_TAG                             "Port"
 #define TCP_PROTOCOL_TAG                     "TCP"
 #define UDP_PROTOCOL_TAG                     "UDP"
+#define DDR_TABLETYPE_TAG                    "DDR"
+#define SRAM_TABLETYPE_TAG                   "SRAM"
+#define HYBRID_TABLETYPE_TAG                 "HYBRID"
 
 /* FIREWALL Config Entries */
 #define Firewall_TAG                         "Firewall"
@@ -177,6 +180,7 @@ if (!(a)) {                                                 \
 
 #define IPACMNat_TAG                         "IPACMNAT"
 #define NAT_MaxEntries_TAG                   "MaxNatEntries"
+#define NAT_TableType_TAG                    "NatTableType"
 
 #define IP_PassthroughFlag_TAG               "IPPassthroughFlag"
 #define IP_PassthroughMode_TAG               "IPPassthroughMode"
@@ -275,6 +279,7 @@ typedef struct  _IPACM_conf_t
 	ipacm_private_subnet_conf_t private_subnet_config;
 	ipacm_alg_conf_t alg_config;
 	int nat_max_entries;
+	const char* nat_table_memtype;
 	bool odu_enable;
 	bool router_mode_enable;
 	bool odu_embms_enable;

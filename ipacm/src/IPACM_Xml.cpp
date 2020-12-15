@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2013, 2019, The Linux Foundation. All rights reserved.
+Copyright (c) 2013, 2019-2020, The Linux Foundation. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -447,6 +447,31 @@ static int ipacm_cfg_xml_parse_tree
 						config->nat_max_entries = atoi(content_buf);
 						IPACMDBG_H("Nat Table Max Entries %d\n", config->nat_max_entries);
 					}
+				}
+				else if (IPACM_util_icmp_string((char*)xml_node->name, NAT_TableType_TAG) == 0)
+				{
+					config->nat_table_memtype = DDR_TABLETYPE_TAG;
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						content_buf[MAX_XML_STR_LEN-1] = '\0';
+						if (0 == strncasecmp(content_buf, DDR_TABLETYPE_TAG, str_size))
+						{
+							config->nat_table_memtype = DDR_TABLETYPE_TAG;
+						}
+						else if (0 == strncasecmp(content_buf, SRAM_TABLETYPE_TAG, str_size))
+						{
+							config->nat_table_memtype = SRAM_TABLETYPE_TAG;
+						}
+						else if (0 == strncasecmp(content_buf, HYBRID_TABLETYPE_TAG, str_size))
+						{
+							config->nat_table_memtype = HYBRID_TABLETYPE_TAG;
+						}
+					}
+					IPACMDBG_H("NAT Table location %s\n", config->nat_table_memtype);
 				}
 			}
 			break;

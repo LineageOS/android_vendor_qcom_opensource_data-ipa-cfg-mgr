@@ -29,28 +29,48 @@
 #define LOG_TAG "IPAHALService/IpaEventRelay"
 /* External Includes */
 #include <cutils/log.h>
+//#include <hidl/Status.h> //TODO: Might be easier to return Status
 
 /* HIDL Includes */
-#include <android/hardware/tetheroffload/control/1.0/ITetheringOffloadCallback.h>
+#include <android/hardware/tetheroffload/control/1.1/ITetheringOffloadCallback.h>
 
 /* Internal Includes */
 #include "IpaEventRelay.h"
 
 /* Namespace pollution avoidance */
-using ::android::hardware::tetheroffload::control::V1_0::ITetheringOffloadCallback;
-using ::android::hardware::tetheroffload::control::V1_0::OffloadCallbackEvent;
+using ::android::hardware::Return;
+// using ::android::hardware::Status;
+using ::android::hardware::tetheroffload::control::V1_1::ITetheringOffloadCallback;
 
 
 IpaEventRelay::IpaEventRelay(
-        const ::android::sp<ITetheringOffloadCallback>& cb) : mFramework(cb) {
+        const ::android::sp<V1_0::ITetheringOffloadCallback>& cb,
+        const ::android::sp<V1_1::ITetheringOffloadCallback>& cb_1_1) : mFramework(cb), mFramework_1_1(cb_1_1) {
 } /* IpaEventRelay */
+
+using OnEventVersion = std::function<Return<void>()>;
+void IpaEventRelay::sendEvent(OffloadCallbackEvent event, int version) {
+    // Events need to be sent for the version passed in and all versions defined after that.
+    // This ensures all new versions get the correct events, but vrsion where events where not
+    // defined do not.
+    std::vector<OnEventVersion> getVersion = {
+        { [&]() -> Return<void> { return mFramework->onEvent(
+            (::android::hardware::tetheroffload::control::V1_0::OffloadCallbackEvent) event); }},
+        { [&]() -> Return<void> { return mFramework_1_1->onEvent_1_1(event); }}
+    };
+
+    for (int i = version; i < getVersion.size(); i++) {
+        OnEventVersion func = getVersion[i];
+        auto ret = func();
+    if (!ret.isOk()) {
+            ALOGE("Triggering onEvent CallbackV1_%d failed.", i);
+    }
+    }
+}
 
 void IpaEventRelay::onOffloadStarted() {
     ALOGI("onOffloadStarted()");
-    auto ret = mFramework->onEvent(OffloadCallbackEvent::OFFLOAD_STARTED);
-    if (!ret.isOk()) {
-        ALOGE("Triggering OffloadStarted Callback failed.");
-    }
+    sendEvent(OffloadCallbackEvent::OFFLOAD_STARTED, V1_0);
 } /* onOffloadStarted */
 
 void IpaEventRelay::onOffloadStopped(StoppedReason reason) {
@@ -63,16 +83,10 @@ void IpaEventRelay::onOffloadStopped(StoppedReason reason) {
          */
     }
     else if ( reason == StoppedReason::ERROR ) {
-        auto ret = mFramework->onEvent(OffloadCallbackEvent::OFFLOAD_STOPPED_ERROR);
-        if (!ret.isOk()) {
-            ALOGE("Triggering OffloadStopped Callback failed.");
-        }
+        sendEvent(OffloadCallbackEvent::OFFLOAD_STOPPED_ERROR, V1_0);
     }
     else if ( reason == StoppedReason::UNSUPPORTED ) {
-        auto ret = mFramework->onEvent(OffloadCallbackEvent::OFFLOAD_STOPPED_UNSUPPORTED);
-        if (!ret.isOk()) {
-            ALOGE("Triggering OffloadStopped Callback failed.");
-        }
+        sendEvent(OffloadCallbackEvent::OFFLOAD_STOPPED_UNSUPPORTED, V1_0);
     }
     else {
         ALOGE("Unknown stopped reason(%d)", reason);
@@ -81,16 +95,16 @@ void IpaEventRelay::onOffloadStopped(StoppedReason reason) {
 
 void IpaEventRelay::onOffloadSupportAvailable() {
     ALOGI("onOffloadSupportAvailable()");
-    auto ret = mFramework->onEvent(OffloadCallbackEvent::OFFLOAD_SUPPORT_AVAILABLE);
-    if (!ret.isOk()) {
-        ALOGE("Triggering OffloadSupportAvailable Callback failed.");
-    }
+    sendEvent(OffloadCallbackEvent::OFFLOAD_SUPPORT_AVAILABLE, V1_0);
 } /* onOffloadSupportAvailable */
 
 void IpaEventRelay::onLimitReached() {
     ALOGI("onLimitReached()");
-    auto ret = mFramework->onEvent(OffloadCallbackEvent::OFFLOAD_STOPPED_LIMIT_REACHED);
-    if (!ret.isOk()) {
-        ALOGE("Triggering LimitReached Callback failed.");
-    }
+    sendEvent(OffloadCallbackEvent::OFFLOAD_STOPPED_LIMIT_REACHED, V1_0);
 } /* onLimitReached */
+
+/** V1_1 API's **/
+void IpaEventRelay::onWarningReached() {
+    ALOGI("onWarningReached()");
+    sendEvent(OffloadCallbackEvent::OFFLOAD_WARNING_REACHED, V1_1);
+} /* onWarningReached */

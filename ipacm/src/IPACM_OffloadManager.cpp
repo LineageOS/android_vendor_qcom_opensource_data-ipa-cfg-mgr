@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -650,6 +650,63 @@ RET IPACM_OffloadManager::setQuota(const char * upstream_name /* upstream */, ui
 	close(fd);
 	return SUCCESS;
 }
+
+RET IPACM_OffloadManager::setQuotaWarning(const char * upstream_name /* upstream */,
+uint64_t quota_mb/* quota limit */, uint64_t warning_mb/* warning limit */)
+{
+#ifdef WAN_IOC_SET_DATA_QUOTA_WARNING
+	wan_ioctl_set_data_quota_warning ioctl_data;
+	int fd = -1, rc = 0, err_type = 0;
+
+	if ((fd = open(DEVICE_NAME, O_RDWR)) < 0)
+	{
+		IPACMERR("Failed opening %s.\n", DEVICE_NAME);
+		return FAIL_HARDWARE;
+	}
+
+	memset(&ioctl_data, 0, sizeof(ioctl_data));
+
+	if (quota_mb != 0)
+	{
+		ioctl_data.quota_mbytes = quota_mb;
+		ioctl_data.set_quota = true;
+	}
+
+	if (warning_mb != 0)
+	{
+		ioctl_data.warning_mbytes = warning_mb;
+		ioctl_data.set_warning = true;
+	}
+
+
+	if (strlcpy(ioctl_data.interface_name, upstream_name, IFNAMSIZ) >= IFNAMSIZ) {
+		IPACMERR("String truncation occurred on upstream");
+		close(fd);
+		return FAIL_INPUT_CHECK;
+	}
+
+	IPACMDBG_H("SET_DATA_QUOTA_WARNING: Dev: %s, Quota: %llu, Warning: %llu\n",
+		ioctl_data.interface_name, (long long)quota_mb,
+		(long long)warning_mb);
+
+	rc = ioctl(fd, WAN_IOC_SET_DATA_QUOTA_WARNING, &ioctl_data);
+	close(fd);
+	if(rc != 0)
+	{
+		err_type = errno;
+		IPACMERR("IOCTL WAN_IOC_SET_DATA_QUOTA_WARNING call failed: %s err_type: %d\n", strerror(err_type), err_type);
+		if (err_type == ENODEV) {
+			IPACMDBG_H("Invalid argument.\n");
+			return FAIL_UNSUPPORTED;
+		}
+		else {
+			return FAIL_TRY_AGAIN;
+		}
+	}
+#endif
+	return SUCCESS;
+}
+
 
 RET IPACM_OffloadManager::getStats(const char * upstream_name /* upstream */,
 		bool reset /* reset */, OffloadStatistics& offload_stats/* ret */)

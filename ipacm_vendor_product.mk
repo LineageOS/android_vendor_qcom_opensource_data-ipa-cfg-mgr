@@ -40,11 +40,9 @@ BOARD_ETH_BRIDGE_LIST += kona
 
 ifneq ($(call is-board-platform-in-list,$(BOARD_PLATFORM_LIST)),true)
 ifneq (,$(filter $(QCOM_BOARD_PLATFORMS),$(TARGET_BOARD_PLATFORM)))
-ifneq (, $(filter aarch64 arm arm64, $(TARGET_ARCH)))
 
 PRODUCT_PACKAGES += $(IPACM_DATA)
 
-endif # $(TARGET_ARCH)
 endif
 endif
 endif

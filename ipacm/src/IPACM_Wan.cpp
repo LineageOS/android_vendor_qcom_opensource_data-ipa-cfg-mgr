@@ -2395,6 +2395,20 @@ int IPACM_Wan::handle_route_add_evt(ipa_ip_type iptype, bool add_only)
 					IPACMERR("Failed to send WAN_IOC_NOTIFY_WAN_STATE as up %d\n ", wan_state.up);
 				}
 				close(fd_wwan_ioctl);
+
+				/* Store the Offload state. */
+				FILE *fp = NULL;
+				fp = fopen(IPA_OFFLOAD_TETHER_STATE_FILE_NAME, "w");
+				if (fp == NULL)
+				{
+					IPACMERR("Failed to write offload state to %s, error is %d - %s\n",
+						IPA_OFFLOAD_TETHER_STATE_FILE_NAME, errno, strerror(errno));
+				}
+				else
+				{
+					fprintf(fp, "UPSTREAM=%s,STATE=UP", dev_name);
+					fclose(fp);
+				}
 			}
 			ipa_pm_q6_check++;
 			IPACMDBG_H("update ipa_pm_q6_check to %d\n", ipa_pm_q6_check);
@@ -5073,6 +5087,20 @@ int IPACM_Wan::handle_route_del_evt_ex(ipa_ip_type iptype)
 					IPACMERR("Failed to send WAN_IOC_NOTIFY_WAN_STATE as up %d\n ", wan_state.up);
 				}
 				close(fd_wwan_ioctl);
+
+				/* Store the Offload state. */
+				FILE *fp = NULL;
+				fp = fopen(IPA_OFFLOAD_TETHER_STATE_FILE_NAME, "w");
+				if (fp == NULL)
+				{
+					IPACMERR("Failed to write offload state to %s, error is %d - %s\n",
+						IPA_OFFLOAD_TETHER_STATE_FILE_NAME, errno, strerror(errno));
+				}
+				else
+				{
+					fprintf(fp, "UPSTREAM=%s,STATE=DOWN", dev_name);
+					fclose(fp);
+				}
 			}
 			if (ipa_pm_q6_check > 0)
 				ipa_pm_q6_check--;

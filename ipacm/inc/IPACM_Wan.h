@@ -63,6 +63,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define NETWORK_STATS "%s %llu %llu %llu %llu"
 #define IPA_NETWORK_STATS_FILE_NAME "/data/misc/ipa/network_stats"
+#define IPA_OFFLOAD_TETHER_STATE_FILE_NAME "/data/vendor/ipa/offload_state"
 
 typedef struct _wan_client_rt_hdl
 {

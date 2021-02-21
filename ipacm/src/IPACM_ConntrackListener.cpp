@@ -888,6 +888,8 @@ void IPACM_ConntrackListener::PopulateTCPorUDPEntry(
 	 uint32_t status,
 	 nat_table_entry *rule)
 {
+	uint32_t repl_dst_ip;
+
 	if (IPS_DST_NAT == status)
 	{
 		IPACMDBG("Destination NAT\n");
@@ -971,6 +973,15 @@ void IPACM_ConntrackListener::PopulateTCPorUDPEntry(
 		if (0 == rule->private_port)
 		{
 			IPACMDBG("unable to retrieve private port\n");
+		}
+
+		/* If Reply destination IP is not Public IP, install dummy NAT rule. */
+		repl_dst_ip = nfct_get_attr_u32(ct, ATTR_REPL_IPV4_DST);
+		repl_dst_ip = ntohl(repl_dst_ip);
+		if(repl_dst_ip != rule->public_ip)
+		{
+			IPACMDBG_H("Reply dst IP:0x%x not equal to wan ip:0x%x\n",repl_dst_ip, rule->public_ip);
+			rule->private_ip = rule->public_ip;
 		}
 	}
 
@@ -1121,8 +1132,8 @@ bool IPACM_ConntrackListener::ProcessTCPorUDPMsg(
 		}
 	}
 
-	PopulateTCPorUDPEntry(ct, status, &rule);
 	rule.public_ip = wan_ipaddr;
+	PopulateTCPorUDPEntry(ct, status, &rule);
 
 	if (rule.private_ip != wan_ipaddr)
 	{

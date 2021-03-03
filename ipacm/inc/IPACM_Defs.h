@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2013-2019, The Linux Foundation. All rights reserved.
+Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -78,6 +78,7 @@ extern "C"
 #define IPA_MAX_IFACE_ENTRIES 20
 #define IPA_MAX_PRIVATE_SUBNET_ENTRIES 3
 #define IPA_MAX_MTU_ENTRIES 3
+#define IPA_MAX_FILTER_CFG_ENTRIES 2
 #define IPA_MAX_ALG_ENTRIES 20
 #define IPA_MAX_RM_ENTRY 6
 
@@ -110,6 +111,8 @@ extern "C"
 #define LOOPBACK_MASK 0xFF000000
 #define LOOPBACK_ADDR 0x7F000000
 
+#define IPACM_FILTER_CFG_FILE "/data/vendor/ipa/IPACM_Filter_cfg.xml"
+
 /*---------------------------------------------------------------------------
 										Return values indicating error status
 ---------------------------------------------------------------------------*/
@@ -136,6 +139,7 @@ typedef enum
 	IPA_CFG_CHANGE_EVENT,                 /* NULL */
 	IPA_PRIVATE_SUBNET_CHANGE_EVENT,          /* ipacm_event_data_fid */
 	IPA_FIREWALL_CHANGE_EVENT,                /* NULL */
+	IPA_FILTER_CFG_CHANGE_EVENT,              /* NULL */
 	IPA_LINK_UP_EVENT,                        /* ipacm_event_data_fid */
 	IPA_LINK_DOWN_EVENT,                      /* ipacm_event_data_fid */
 	IPA_USB_LINK_UP_EVENT,                    /* ipacm_event_data_fid */

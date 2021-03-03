@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
+Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -1155,6 +1155,31 @@ void IPACM_Wan::event_callback(ipa_cm_event_id event, void *param)
 		}
 		break;
 
+	case IPA_FILTER_CFG_CHANGE_EVENT:
+		{
+			IPACMDBG_H("Received IPA_FILTER_CFG_CHANGE_EVENT\n");
+
+			if(m_is_sta_mode == Q6_WAN)
+			{
+				if(is_default_gateway == false)
+				{
+					IPACMDBG_H("Interface %s is not default gw, return.\n", dev_name);
+					return;
+				}
+
+				if(ip_type == IPA_IP_v4 || ip_type == IPA_IP_MAX)
+				{
+					del_wan_firewall_rule(IPA_IP_v4);
+					config_wan_firewall_rule(IPA_IP_v4);
+					install_wan_filtering_rule(false);
+				}
+				else
+				{
+					IPACMERR("IP type is not expected.\n");
+				}
+			}
+		}
+		break;
 	case IPA_COALESCE_NOTICE:
 		{
 			if (m_is_sta_mode == Q6_WAN)
@@ -4093,6 +4118,82 @@ int IPACM_Wan::config_dft_firewall_rules_ex(struct ipa_flt_rule_add *rules, int 
 	return IPACM_SUCCESS;
 }
 
+/* configure the DL Ack rule if enabled */
+int IPACM_Wan::config_filter_dl_ack_rule_ex(struct ipa_flt_rule_add *rules, int rule_offset, ipa_ip_type iptype)
+{
+	struct ipa_flt_rule_add flt_rule_entry;
+	ipa_ioc_get_rt_tbl_indx rt_tbl_idx;
+	ipa_ioc_generate_flt_eq flt_eq;
+
+	IPACMDBG_H("ip-family: %d; \n", iptype);
+
+	if (rx_prop == NULL)
+	{
+		IPACMDBG_H("No rx properties registered for iface %s\n", dev_name);
+		return IPACM_SUCCESS;
+	}
+
+	if(rules == NULL || rule_offset < 0)
+	{
+		IPACMERR("No filtering table is available.\n");
+		return IPACM_FAILURE;
+	}
+
+	if (iptype == IPA_IP_v4)
+	{
+		memset(&flt_rule_entry, 0, sizeof(struct ipa_flt_rule_add));
+
+		flt_rule_entry.at_rear = true;
+		flt_rule_entry.flt_rule_hdl = -1;
+		flt_rule_entry.status = -1;
+
+		flt_rule_entry.rule.retain_hdr = 1;
+		flt_rule_entry.rule.to_uc = 0;
+		flt_rule_entry.rule.eq_attrib_type = 1;
+
+		flt_rule_entry.rule.action = IPA_PASS_TO_ROUTING;
+		if (IPACM_Iface::ipacmcfg->isIPAv3Supported())
+				flt_rule_entry.rule.hashable = false;
+		memset(&rt_tbl_idx, 0, sizeof(rt_tbl_idx));
+		rt_tbl_idx.ip = iptype;
+		strlcpy(rt_tbl_idx.name, IPACM_Iface::ipacmcfg->rt_tbl_wan_dl.name, IPA_RESOURCE_NAME_MAX);
+		rt_tbl_idx.name[IPA_RESOURCE_NAME_MAX-1] = '\0';
+		if(0 != ioctl(m_fd_ipa, IPA_IOC_QUERY_RT_TBL_INDEX, &rt_tbl_idx))
+		{
+			IPACMERR("Failed to get routing table index from name\n");
+			return IPACM_FAILURE;
+		}
+		flt_rule_entry.rule.rt_tbl_idx = rt_tbl_idx.idx;
+
+		IPACMDBG_H("Routing table %s has index %d\n", rt_tbl_idx.name, rt_tbl_idx.idx);
+		memcpy(&flt_rule_entry.rule.attrib,
+					 &rx_prop->rx[0].attrib,
+					 sizeof(flt_rule_entry.rule.attrib));
+		flt_rule_entry.rule.attrib.attrib_mask |= IPA_FLT_IS_PURE_ACK;
+
+		change_to_network_order(IPA_IP_v4, &flt_rule_entry.rule.attrib);
+
+		memset(&flt_eq, 0, sizeof(flt_eq));
+		memcpy(&flt_eq.attrib, &flt_rule_entry.rule.attrib, sizeof(flt_eq.attrib));
+		flt_eq.ip = iptype;
+		if(0 != ioctl(m_fd_ipa, IPA_IOC_GENERATE_FLT_EQ, &flt_eq))
+		{
+			IPACMERR("Failed to get eq_attrib\n");
+			return IPACM_FAILURE;
+		}
+		memcpy(&flt_rule_entry.rule.eq_attrib,
+			&flt_eq.eq_attrib,
+			sizeof(flt_rule_entry.rule.eq_attrib));
+
+		memcpy(&(rules[rule_offset]), &flt_rule_entry, sizeof(struct ipa_flt_rule_add));
+		IPACMDBG_H("Filter rule attrib mask: 0x%x\n", rules[rule_offset].rule.attrib.attrib_mask);
+		IPACM_Wan::num_v4_flt_rule++;
+		IPACMDBG_H("Constructed DL Ack rule for ip type %d\n", iptype);
+	}
+	return IPACM_SUCCESS;
+}
+
+
 int IPACM_Wan::init_fl_rule_ex(ipa_ip_type iptype)
 {
 	int res = IPACM_SUCCESS;
@@ -4416,6 +4517,19 @@ int IPACM_Wan::config_wan_firewall_rule(ipa_ip_type iptype)
 			goto fail;
 		}
 		IPACMDBG_H("Succeded in constructing ICMP/ALG rules for ip type %d\n", iptype);
+
+		/* Install DL ACK Rule if enabled. */
+		if (IPACM_Iface::ipacmcfg->filter_config.filter_enable &&
+			IPACM_Iface::ipacmcfg->filter_config.dl_ack_filter_enable)
+		{
+			if(IPACM_FAILURE == config_filter_dl_ack_rule_ex(flt_rule_v4, IPACM_Wan::num_v4_flt_rule, IPA_IP_v4))
+			{
+				IPACMERR("Failed to add DL ack filter rules.\n");
+				res = IPACM_FAILURE;
+				goto fail;
+			}
+			IPACMDBG_H("Succeded in constructing DL ACK rule for ip type %d\n", iptype);
+		}
 
 		if(IPACM_FAILURE == config_dft_firewall_rules_ex(flt_rule_v4, IPACM_Wan::num_v4_flt_rule, IPA_IP_v4))
 		{

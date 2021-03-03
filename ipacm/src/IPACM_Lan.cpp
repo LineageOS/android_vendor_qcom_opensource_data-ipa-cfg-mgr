@@ -57,6 +57,8 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 bool IPACM_Lan::odu_up = false;
 
+struct ipa_lan_downstream_info IPACM_Lan::downstream_info[IPA_MAX_TETHER_IFACE_ENTRIES];
+
 IPACM_Lan::IPACM_Lan(int iface_index) : IPACM_Iface(iface_index)
 {
 	num_eth_client = 0;
@@ -133,6 +135,7 @@ IPACM_Lan::IPACM_Lan(int iface_index) : IPACM_Iface(iface_index)
 	memset(ipv6_prefix_flt_rule_hdl, 0, (NUM_IPV6_PREFIX_FLT_RULE + NUM_IPV6_PREFIX_MTU_RULE) * sizeof(uint32_t));
 	memset(ipv6_icmp_flt_rule_hdl, 0, NUM_IPV6_ICMP_FLT_RULE * sizeof(uint32_t));
 	memset(ipv6_prefix, 0, sizeof(ipv6_prefix));
+	memset(filter_cfg_rule_hdl, 0, sizeof(filter_cfg_rule_hdl));
 
 	/* ODU routing table initilization */
 	if(ipa_if_cate == ODU_IF)
@@ -275,6 +278,20 @@ void IPACM_Lan::event_callback(ipa_cm_event_id event, void *param)
 		}
 		break;
 
+	case IPA_FILTER_CFG_CHANGE_EVENT:
+	{
+		IPACMDBG_H("Received IPA_FILTER_CFG_CHANGE_EVENT");
+
+		/* IPA_IP_MAX means both ipv4 and ipv6 */
+		if ((ip_type == IPA_IP_v4 || ip_type == IPA_IP_MAX)
+			&& IPACM_Wan::isWanUP(ipa_if_num))
+		{
+			handle_filter_cfg_update(IPA_IP_v4);
+		}
+
+	}
+	break;
+
 	case IPA_PRIVATE_SUBNET_CHANGE_EVENT:
 		{
 			ipacm_event_data_fid *data = (ipacm_event_data_fid *)param;
@@ -398,6 +415,8 @@ void IPACM_Lan::event_callback(ipa_cm_event_id event, void *param)
 #ifdef FEATURE_IPA_ANDROID
 					add_dummy_private_subnet_flt_rule(data->iptype);
 					handle_private_subnet_android(data->iptype);
+					add_dummy_filter_cfg_rules(data->iptype);
+					handle_filter_cfg_update(data->iptype);
 #else
 					handle_private_subnet(data->iptype);
 #endif // FEATURE_IPA_ANDROID end
@@ -418,6 +437,8 @@ void IPACM_Lan::event_callback(ipa_cm_event_id event, void *param)
 #ifdef FEATURE_IPA_ANDROID
 						add_dummy_private_subnet_flt_rule(data->iptype);
 						handle_private_subnet_android(data->iptype);
+						add_dummy_filter_cfg_rules(data->iptype);
+						handle_filter_cfg_update(data->iptype);
 #else
 						handle_private_subnet(data->iptype);
 #endif // FEATURE_IPA_ANDROID end
@@ -755,7 +776,9 @@ void IPACM_Lan::event_callback(ipa_cm_event_id event, void *param)
 			if (data->prefix.iptype < IPA_IP_MAX && is_downstream_set[data->prefix.iptype] == false)
 			{
 				IPACMDBG_H("Add downstream for IP iptype %d\n", data->prefix.iptype);
+
 				is_downstream_set[data->prefix.iptype] = true;
+				store_downstream_state(true, data->prefix.iptype);
 				memcpy(&prefix[data->prefix.iptype], &data->prefix,
 					sizeof(prefix[data->prefix.iptype]));
 
@@ -808,7 +831,7 @@ void IPACM_Lan::event_callback(ipa_cm_event_id event, void *param)
 			{
 				IPACMDBG_H("Del downstream for IP iptype %d.\n", data->prefix.iptype);
 				is_downstream_set[data->prefix.iptype] = false;
-
+				store_downstream_state(false, data->prefix.iptype);
 				if (is_upstream_set[data->prefix.iptype] == true)
 				{
 					IPACMDBG_H("Upstream was set before, deleting UL rules.\n");
@@ -1147,6 +1170,71 @@ void IPACM_Lan::event_callback(ipa_cm_event_id event, void *param)
 	return;
 }
 
+void IPACM_Lan::store_downstream_state(bool up, enum ipa_ip_type iptype)
+{
+	/* Store the downstream state. */
+	FILE *fp = NULL;
+	bool state_update = false;
+	int free_index = -1;
+
+	/* Return if other iptype is active. */
+	if ((iptype == IPA_IP_v4 && is_downstream_set[IPA_IP_v6]) ||
+		(iptype == IPA_IP_v6 && is_downstream_set[IPA_IP_v4]))
+		return;
+
+	/* Update the downstream state info. */
+	for (int i=0; i < IPA_MAX_TETHER_IFACE_ENTRIES; i++)
+	{
+		if (IPACM_Lan::downstream_info[i].entry_in_use &&
+			strncmp(dev_name, IPACM_Lan::downstream_info[i].dev_name, IF_NAME_LEN) == 0)
+		{
+			/* Update state. */
+			IPACM_Lan::downstream_info[i].downstream_state = up;
+			state_update = true;
+			IPACMDBG_H("Updating info for tether iface :%s, State: %s\n", dev_name,
+				up ? "UP" : "DOWN");
+			break;
+		}
+
+		if (!IPACM_Lan::downstream_info[i].entry_in_use && free_index == -1)
+			free_index = i;
+	}
+
+	/* if state is up, check if entry is already present, if not add. */
+	if (up && !state_update && free_index != -1)
+	{
+		IPACM_Lan::downstream_info[free_index].entry_in_use = true;
+		IPACM_Lan::downstream_info[free_index].downstream_state = up;
+		strlcpy(IPACM_Lan::downstream_info[free_index].dev_name,
+			dev_name, IF_NAME_LEN);
+		IPACMDBG_H("Adding new tether iface :%s, State: UP\n", dev_name);
+	}
+	else if (free_index == -1)
+	{
+		IPACMERR("Exceeded max tether ifaces: not storing info for %s\n", dev_name);
+		return;
+	}
+
+	fp = fopen(IPA_DOWNSTREAM_TETHER_STATE_FILE_NAME, "w");
+	if (fp == NULL)
+	{
+		IPACMERR("Failed to write downstream state to %s, error is %d - %s\n",
+			IPA_DOWNSTREAM_TETHER_STATE_FILE_NAME,
+			errno, strerror(errno));
+	}
+	else
+	{
+		for (int i=0; i < IPA_MAX_TETHER_IFACE_ENTRIES; i++)
+		{
+			if (IPACM_Lan::downstream_info[i].entry_in_use)
+			{
+				fprintf(fp, "DOWNSTREAM=%s,STATE=%s;", IPACM_Lan::downstream_info[i].dev_name,
+					IPACM_Lan::downstream_info[i].downstream_state ? "UP" : "DOWN");
+			}
+		}
+		fclose(fp);
+	}
+}
 
 int IPACM_Lan::handle_del_ipv6_addr(ipacm_event_data_all *data)
 {
@@ -1938,6 +2026,9 @@ int IPACM_Lan::handle_wan_up_ex(ipacm_ext_prop *ext_prop, ipa_ip_type iptype, ui
 #endif
 		/* add MTU rules for ipv4 */
 		handle_private_subnet_android(IPA_IP_v4);
+		/* Add filter config rules for ipv4 */
+		handle_filter_cfg_update(IPA_IP_v4);
+
 
 		/* Update ipv6 MTU here if WAN_v6 is up and filter rules were installed */
 		if (IPACM_Wan::isWanUP_V6(ipa_if_num))
@@ -3085,6 +3176,18 @@ int IPACM_Lan::handle_down_evt()
 #endif
 	}
 
+	if (is_downstream_set[IPA_IP_v4])
+	{
+		is_downstream_set[IPA_IP_v4] = false;
+		store_downstream_state(false, IPA_IP_v4);
+	}
+
+	if (is_downstream_set[IPA_IP_v6])
+	{
+		is_downstream_set[IPA_IP_v6] = false;
+		store_downstream_state(false, IPA_IP_v6);
+	}
+
 	/* delete default filter rules */
 	if (ip_type != IPA_IP_v6 && rx_prop != NULL)
 	{
@@ -3134,6 +3237,14 @@ int IPACM_Lan::handle_down_evt()
 		IPACM_Iface::ipacmcfg->decreaseFltRuleCount(rx_prop->rx[0].src_pipe, IPA_IP_v4, IPACM_Iface::ipacmcfg->ipa_num_private_subnet);
 #endif
 		IPACMDBG_H("Deleted private subnet v4 filter rules successfully.\n");
+
+		if(m_filtering.DeleteFilteringHdls(filter_cfg_rule_hdl, IPA_IP_v4, IPA_MAX_FILTER_CFG_ENTRIES) == false)
+		{
+			IPACMERR("Error deleting filter cfg rules.\n");
+			res = IPACM_FAILURE;
+			goto fail;
+		}
+		IPACM_Iface::ipacmcfg->decreaseFltRuleCount(rx_prop->rx[0].src_pipe, IPA_IP_v4, IPA_MAX_FILTER_CFG_ENTRIES);
 	}
 	IPACMDBG_H("Finished delete default iface ipv4 filtering rules \n ");
 
@@ -4212,6 +4323,194 @@ fail:
 	free(pFilteringTable);
 	return res;
 }
+
+int IPACM_Lan::add_dummy_filter_cfg_rules(ipa_ip_type iptype)
+{
+	int i, len, res = IPACM_SUCCESS;
+	struct ipa_flt_rule_add flt_rule;
+	ipa_ioc_add_flt_rule* pFilteringTable;
+	bool result;
+
+	if(rx_prop == NULL)
+	{
+		IPACMDBG_H("There is no rx_prop for iface %s, not able to add dummy filter cfg rules.\n", dev_name);
+		return 0;
+	}
+
+	if(iptype == IPA_IP_v6)
+	{
+		IPACMDBG_H("There is no ipv6 dummy filter config rules needed for iface %s\n", dev_name);
+		return 0;
+	}
+
+	len = sizeof(struct ipa_ioc_add_flt_rule) + IPA_MAX_FILTER_CFG_ENTRIES * sizeof(struct ipa_flt_rule_add);
+
+	pFilteringTable = (struct ipa_ioc_add_flt_rule *)malloc(len);
+	if (pFilteringTable == NULL)
+	{
+		IPACMERR("Error allocate flt table memory...\n");
+		return IPACM_FAILURE;
+	}
+	memset(pFilteringTable, 0, len);
+
+	pFilteringTable->commit = 1;
+	pFilteringTable->ep = rx_prop->rx[0].src_pipe;
+	pFilteringTable->global = false;
+	pFilteringTable->ip = iptype;
+	pFilteringTable->num_rules = IPA_MAX_FILTER_CFG_ENTRIES;
+
+	memset(&flt_rule, 0, sizeof(struct ipa_flt_rule_add));
+
+	flt_rule.rule.retain_hdr = 0;
+	flt_rule.at_rear = true;
+	flt_rule.flt_rule_hdl = -1;
+	flt_rule.status = -1;
+	flt_rule.rule.action = IPA_PASS_TO_EXCEPTION;
+	if (IPACM_Iface::ipacmcfg->isIPAv3Supported())
+		flt_rule.rule.hashable = true;
+	memcpy(&flt_rule.rule.attrib, &rx_prop->rx[0].attrib,
+			sizeof(flt_rule.rule.attrib));
+
+	if(iptype == IPA_IP_v4)
+	{
+		flt_rule.rule.attrib.attrib_mask = IPA_FLT_SRC_ADDR | IPA_FLT_DST_ADDR;
+		flt_rule.rule.attrib.u.v4.src_addr_mask = ~0;
+		flt_rule.rule.attrib.u.v4.src_addr = ~0;
+		flt_rule.rule.attrib.u.v4.dst_addr_mask = ~0;
+		flt_rule.rule.attrib.u.v4.dst_addr = ~0;
+
+		for(i=0; i<IPA_MAX_FILTER_CFG_ENTRIES; i++)
+		{
+			memcpy(&(pFilteringTable->rules[i]), &flt_rule, sizeof(struct ipa_flt_rule_add));
+		}
+
+#ifdef IPA_IOCTL_SET_FNR_COUNTER_INFO
+		/* use index hw-counter */
+		if(ipa_if_cate == WLAN_IF && IPACM_Iface::ipacmcfg->hw_fnr_stats_support)
+		{
+			IPACMDBG_H("hw-index-enable %d, counter %d\n", IPACM_Iface::ipacmcfg->hw_fnr_stats_support, IPACM_Iface::ipacmcfg->hw_counter_offset + UL_ALL);
+			result = m_filtering.AddFilteringRule_hw_index(pFilteringTable, IPACM_Iface::ipacmcfg->hw_counter_offset + UL_ALL);
+		} else {
+			result = m_filtering.AddFilteringRule(pFilteringTable);
+		}
+#else
+		result = m_filtering.AddFilteringRule(pFilteringTable);
+#endif
+
+		if (result == false)
+		{
+			IPACMERR("Error adding dummy filter cfg rules\n");
+			res = IPACM_FAILURE;
+			goto fail;
+		}
+		else
+		{
+			IPACM_Iface::ipacmcfg->increaseFltRuleCount(rx_prop->rx[0].src_pipe, IPA_IP_v4, IPA_MAX_FILTER_CFG_ENTRIES);
+			/* copy filter rule hdls */
+			for (int i = 0; i < IPA_MAX_FILTER_CFG_ENTRIES; i++)
+			{
+				if (pFilteringTable->rules[i].status == 0)
+				{
+					filter_cfg_rule_hdl[i] = pFilteringTable->rules[i].flt_rule_hdl;
+					IPACMDBG_H("Filter cfg rule %d hdl:0x%x\n", i, private_fl_rule_hdl[i]);
+				}
+				else
+				{
+					IPACMERR("Failed adding filter cfg rule %d\n", i);
+					res = IPACM_FAILURE;
+					goto fail;
+				}
+			}
+		}
+	}
+fail:
+	free(pFilteringTable);
+	return res;
+}
+
+
+int IPACM_Lan::handle_filter_cfg_update(ipa_ip_type iptype)
+{
+	int i, len, res = IPACM_SUCCESS;
+	struct ipa_flt_rule_mdfy flt_rule;
+	struct ipa_ioc_mdfy_flt_rule* pFilteringTable = NULL;
+
+	if (rx_prop == NULL)
+	{
+		IPACMDBG_H("No rx properties registered for iface %s\n", dev_name);
+		return IPACM_SUCCESS;
+	}
+
+	if(iptype == IPA_IP_v6)
+	{
+		IPACMDBG_H("Ipv6 Filter config is not supported for iface %s\n", dev_name);
+		return 0;
+	}
+
+	for(i=0; i<IPA_MAX_FILTER_CFG_ENTRIES; i++)
+	{
+		reset_to_dummy_flt_rule(IPA_IP_v4, filter_cfg_rule_hdl[i]);
+	}
+
+	if(IPACM_Iface::ipacmcfg->filter_config.filter_enable == true)
+	{
+		if ((IPACM_Iface::ipacmcfg->filter_config.num_filter_cfg_entries == 0) ||
+			(IPACM_Iface::ipacmcfg->filter_config.num_filter_cfg_entries > IPA_MAX_FILTER_CFG_ENTRIES))
+		{
+			IPACMERR("Invalid filter Config num rules %d\n",
+				IPACM_Iface::ipacmcfg->filter_config.num_filter_cfg_entries);
+			return IPACM_FAILURE;
+		}
+
+		IPACMDBG_H("total %d filter cfg rules are needed\n", IPACM_Iface::ipacmcfg->filter_config.num_filter_cfg_entries);
+
+		len = sizeof(struct ipa_ioc_mdfy_flt_rule) + IPACM_Iface::ipacmcfg->filter_config.num_filter_cfg_entries * sizeof(struct ipa_flt_rule_mdfy);
+		pFilteringTable = (struct ipa_ioc_mdfy_flt_rule*)malloc(len);
+		if (!pFilteringTable)
+		{
+			IPACMERR("Failed to allocate ipa_ioc_mdfy_flt_rule memory...\n");
+			return IPACM_FAILURE;
+		}
+		memset(pFilteringTable, 0, len);
+
+		pFilteringTable->commit = 1;
+		pFilteringTable->ip = iptype;
+		pFilteringTable->num_rules = (uint8_t)IPACM_Iface::ipacmcfg->filter_config.num_filter_cfg_entries;
+
+		for (i = 0; i < IPACM_Iface::ipacmcfg->filter_config.num_filter_cfg_entries; i++)
+		{
+			/* add filter cfg for ipv4 */
+			memset(&flt_rule, 0, sizeof(struct ipa_flt_rule_mdfy));
+			flt_rule.status = -1;
+			flt_rule.rule.retain_hdr = 1;
+			flt_rule.rule.to_uc = 0;
+			flt_rule.rule.action = IPA_PASS_TO_EXCEPTION;
+			flt_rule.rule.eq_attrib_type = 0;
+			if (IPACM_Iface::ipacmcfg->isIPAv3Supported())
+				flt_rule.rule.hashable = true;
+			flt_rule.rule_hdl = filter_cfg_rule_hdl[i];
+			memcpy(&flt_rule.rule.attrib,
+				&IPACM_Iface::ipacmcfg->filter_config.filter_cfg_entries[i].attrib,
+				sizeof(struct ipa_rule_attrib));
+			flt_rule.rule.attrib.attrib_mask |= rx_prop->rx[0].attrib.attrib_mask;
+			memcpy(&(pFilteringTable->rules[i]), &flt_rule, sizeof(struct ipa_flt_rule_mdfy));
+		}
+
+		if (false == m_filtering.ModifyFilteringRule(pFilteringTable))
+		{
+			IPACMERR("Failed to modify filter config rules.\n");
+			res = IPACM_FAILURE;
+			goto fail;
+		}
+	}
+fail:
+	if(pFilteringTable != NULL)
+	{
+		free(pFilteringTable);
+	}
+	return res;
+}
+
 
 int IPACM_Lan::handle_private_subnet_android(ipa_ip_type iptype)
 {

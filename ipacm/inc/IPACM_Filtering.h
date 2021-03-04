@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2013-2019, The Linux Foundation. All rights reserved.
+Copyright (c) 2013-2019,2021, The Linux Foundation. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -56,6 +56,7 @@ public:
 	IPACM_Filtering();
 	~IPACM_Filtering();
 	bool AddFilteringRule(struct ipa_ioc_add_flt_rule const *ruleTable);
+	bool AddFilteringRule_v2(struct ipa_ioc_add_flt_rule_v2 const *ruleTable);
 	bool AddFilteringRuleAfter(struct ipa_ioc_add_flt_rule_after const *ruleTable);
 #ifdef IPA_IOCTL_SET_FNR_COUNTER_INFO
 	bool AddFilteringRule_hw_index(struct ipa_ioc_add_flt_rule *ruleTable, int hw_counter_index);

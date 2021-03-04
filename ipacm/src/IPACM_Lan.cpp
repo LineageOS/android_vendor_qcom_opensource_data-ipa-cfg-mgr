@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2013-2020, The Linux Foundation. All rights reserved.
+Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -3960,144 +3960,154 @@ int IPACM_Lan::handle_lan_client_reset_rt(ipa_ip_type iptype)
 
 int IPACM_Lan::install_ipv4_icmp_flt_rule()
 {
-	int len;
-	struct ipa_ioc_add_flt_rule* flt_rule;
-	struct ipa_flt_rule_add flt_rule_entry;
-	bool result;
+	int ret = IPACM_SUCCESS;
+	struct ipa_ioc_add_flt_rule_v2 *flt_rule;
+	struct ipa_flt_rule_add_v2 *flt_rule_entry;
 
 	if(rx_prop != NULL)
 	{
-		len = sizeof(struct ipa_ioc_add_flt_rule) + sizeof(struct ipa_flt_rule_add);
-
-		flt_rule = (struct ipa_ioc_add_flt_rule *)calloc(1, len);
+		flt_rule = (struct ipa_ioc_add_flt_rule_v2 *)calloc(1,
+			sizeof(struct ipa_ioc_add_flt_rule_v2));
 		if (!flt_rule)
 		{
-			IPACMERR("Error Locate ipa_flt_rule_add memory...\n");
+			IPACMERR("Error Locate ipa_ioc_add_flt_rule_v2 memory...\n");
 			return IPACM_FAILURE;
 		}
+		flt_rule_entry = (struct ipa_flt_rule_add_v2 *)calloc(1, sizeof(struct ipa_flt_rule_add_v2));
+		if (!flt_rule_entry)
+		{
+			IPACMERR("Failed to allocate ipa_flt_rule_add_v2 memory...\n");
+			free(flt_rule);
+			return IPACM_FAILURE;
+		}
+		flt_rule->rules = (uint64_t)flt_rule_entry;
 
 		flt_rule->commit = 1;
 		flt_rule->ep = rx_prop->rx[0].src_pipe;
 		flt_rule->global = false;
 		flt_rule->ip = IPA_IP_v4;
 		flt_rule->num_rules = 1;
+		flt_rule->flt_rule_size = sizeof(struct ipa_flt_rule_add_v2);
 
-		memset(&flt_rule_entry, 0, sizeof(struct ipa_flt_rule_add));
-
-		flt_rule_entry.rule.retain_hdr = 1;
-		flt_rule_entry.rule.to_uc = 0;
-		flt_rule_entry.rule.eq_attrib_type = 0;
-		flt_rule_entry.at_rear = true;
-		flt_rule_entry.flt_rule_hdl = -1;
-		flt_rule_entry.status = -1;
-		flt_rule_entry.rule.action = IPA_PASS_TO_EXCEPTION;
+		flt_rule_entry->rule.retain_hdr = 1;
+		flt_rule_entry->rule.to_uc = 0;
+		flt_rule_entry->rule.eq_attrib_type = 0;
+		flt_rule_entry->at_rear = true;
+		flt_rule_entry->flt_rule_hdl = -1;
+		flt_rule_entry->status = -1;
+		flt_rule_entry->rule.action = IPA_PASS_TO_EXCEPTION;
 		if (IPACM_Iface::ipacmcfg->isIPAv3Supported())
-			flt_rule_entry.rule.hashable = true;
-		memcpy(&flt_rule_entry.rule.attrib, &rx_prop->rx[0].attrib, sizeof(flt_rule_entry.rule.attrib));
+			flt_rule_entry->rule.hashable = true;
+		flt_rule_entry->rule.close_aggr_irq_mod = true;
+		memcpy(&flt_rule_entry->rule.attrib,
+			&rx_prop->rx[0].attrib,
+			sizeof(flt_rule_entry->rule.attrib));
 
-		flt_rule_entry.rule.attrib.attrib_mask |= IPA_FLT_PROTOCOL;
-		flt_rule_entry.rule.attrib.u.v4.protocol = (uint8_t)IPACM_FIREWALL_IPPROTO_ICMP;
-		memcpy(&(flt_rule->rules[0]), &flt_rule_entry, sizeof(struct ipa_flt_rule_add));
+		flt_rule_entry->rule.attrib.attrib_mask |= IPA_FLT_PROTOCOL;
+		flt_rule_entry->rule.attrib.u.v4.protocol = (uint8_t)IPACM_FIREWALL_IPPROTO_ICMP;
 
 #ifdef IPA_IOCTL_SET_FNR_COUNTER_INFO
 		/* use index hw-counter */
 		if(ipa_if_cate == WLAN_IF && IPACM_Iface::ipacmcfg->hw_fnr_stats_support)
 		{
-			IPACMDBG_H("hw-index-enable %d, counter %d\n", IPACM_Iface::ipacmcfg->hw_fnr_stats_support, IPACM_Iface::ipacmcfg->hw_counter_offset + UL_ALL);
-			result = m_filtering.AddFilteringRule_hw_index(flt_rule, IPACM_Iface::ipacmcfg->hw_counter_offset + UL_ALL);
-		} else {
-			result = m_filtering.AddFilteringRule(flt_rule);
+			IPACMDBG_H("hw-index-enable %d, counter %d\n",
+				IPACM_Iface::ipacmcfg->hw_fnr_stats_support,
+				IPACM_Iface::ipacmcfg->hw_counter_offset + UL_ALL);
+			flt_rule_entry->rule.enable_stats = 1;
+			flt_rule_entry->rule.cnt_idx = IPACM_Iface::ipacmcfg->hw_counter_offset + UL_ALL;
 		}
-#else
-		result = m_filtering.AddFilteringRule(flt_rule);
 #endif
 
-		if (result == false)
+		if (m_filtering.AddFilteringRule_v2(flt_rule) == false)
 		{
 			IPACMERR("Error Adding Filtering rule, aborting...\n");
-			free(flt_rule);
-			return IPACM_FAILURE;
+			ret = IPACM_FAILURE;
 		}
 		else
 		{
 			IPACM_Iface::ipacmcfg->increaseFltRuleCount(rx_prop->rx[0].src_pipe, IPA_IP_v4, 1);
-			ipv4_icmp_flt_rule_hdl[0] = flt_rule->rules[0].flt_rule_hdl;
+			ipv4_icmp_flt_rule_hdl[0] = flt_rule_entry->flt_rule_hdl;
 			IPACMDBG_H("IPv4 icmp filter rule HDL:0x%x\n", ipv4_icmp_flt_rule_hdl[0]);
-                        free(flt_rule);
 		}
+		free(flt_rule_entry);
+		free(flt_rule);
 	}
-	return IPACM_SUCCESS;
+
+	return ret;
 }
 
 int IPACM_Lan::install_ipv6_icmp_flt_rule()
 {
-
-	int len;
-	struct ipa_ioc_add_flt_rule* flt_rule;
-	struct ipa_flt_rule_add flt_rule_entry;
-	bool result;
+	int ret = IPACM_SUCCESS;
+	struct ipa_ioc_add_flt_rule_v2 *flt_rule;
+	struct ipa_flt_rule_add_v2 *flt_rule_entry;
 
 	if(rx_prop != NULL)
 	{
-		len = sizeof(struct ipa_ioc_add_flt_rule) + sizeof(struct ipa_flt_rule_add);
-
-		flt_rule = (struct ipa_ioc_add_flt_rule *)calloc(1, len);
+		flt_rule = (struct ipa_ioc_add_flt_rule_v2 *)calloc(1, sizeof(struct ipa_ioc_add_flt_rule_v2));
 		if (!flt_rule)
 		{
-			IPACMERR("Error Locate ipa_flt_rule_add memory...\n");
+			IPACMERR("Error Locate ipa_ioc_add_flt_rule_v2 memory...\n");
 			return IPACM_FAILURE;
 		}
+		flt_rule_entry = (struct ipa_flt_rule_add_v2 *)calloc(1, sizeof(struct ipa_flt_rule_add_v2));
+		if (!flt_rule_entry)
+		{
+			IPACMERR("Failed to allocate ipa_flt_rule_add_v2 memory...\n");
+			free(flt_rule);
+			return IPACM_FAILURE;
+		}
+		flt_rule->rules = (uint64_t)flt_rule_entry;
 
 		flt_rule->commit = 1;
 		flt_rule->ep = rx_prop->rx[0].src_pipe;
 		flt_rule->global = false;
 		flt_rule->ip = IPA_IP_v6;
 		flt_rule->num_rules = 1;
+		flt_rule->flt_rule_size = sizeof(struct ipa_flt_rule_add_v2);
 
-		memset(&flt_rule_entry, 0, sizeof(struct ipa_flt_rule_add));
-
-		flt_rule_entry.rule.retain_hdr = 1;
-		flt_rule_entry.rule.to_uc = 0;
-		flt_rule_entry.rule.eq_attrib_type = 0;
-		flt_rule_entry.at_rear = true;
-		flt_rule_entry.flt_rule_hdl = -1;
-		flt_rule_entry.status = -1;
-		flt_rule_entry.rule.action = IPA_PASS_TO_EXCEPTION;
+		flt_rule_entry->rule.retain_hdr = 1;
+		flt_rule_entry->rule.to_uc = 0;
+		flt_rule_entry->rule.eq_attrib_type = 0;
+		flt_rule_entry->at_rear = true;
+		flt_rule_entry->flt_rule_hdl = -1;
+		flt_rule_entry->status = -1;
+		flt_rule_entry->rule.action = IPA_PASS_TO_EXCEPTION;
 		if (IPACM_Iface::ipacmcfg->isIPAv3Supported())
-			flt_rule_entry.rule.hashable = false;
-		memcpy(&flt_rule_entry.rule.attrib, &rx_prop->rx[0].attrib, sizeof(flt_rule_entry.rule.attrib));
-		flt_rule_entry.rule.attrib.attrib_mask |= IPA_FLT_NEXT_HDR;
-		flt_rule_entry.rule.attrib.u.v6.next_hdr = (uint8_t)IPACM_FIREWALL_IPPROTO_ICMP6;
-		memcpy(&(flt_rule->rules[0]), &flt_rule_entry, sizeof(struct ipa_flt_rule_add));
+			flt_rule_entry->rule.hashable = false;
+		flt_rule_entry->rule.close_aggr_irq_mod = true;
+		memcpy(&flt_rule_entry->rule.attrib, &rx_prop->rx[0].attrib, sizeof(flt_rule_entry->rule.attrib));
+
+		flt_rule_entry->rule.attrib.attrib_mask |= IPA_FLT_NEXT_HDR;
+		flt_rule_entry->rule.attrib.u.v6.next_hdr = (uint8_t)IPACM_FIREWALL_IPPROTO_ICMP6;
 
 #ifdef IPA_IOCTL_SET_FNR_COUNTER_INFO
 		/* use index hw-counter */
 		if(ipa_if_cate == WLAN_IF && IPACM_Iface::ipacmcfg->hw_fnr_stats_support)
 		{
-			IPACMDBG_H("hw-index-enable %d, counter %d\n", IPACM_Iface::ipacmcfg->hw_fnr_stats_support, IPACM_Iface::ipacmcfg->hw_counter_offset + UL_ALL);
-			result = m_filtering.AddFilteringRule_hw_index(flt_rule, IPACM_Iface::ipacmcfg->hw_counter_offset + UL_ALL);
-		} else {
-			result = m_filtering.AddFilteringRule(flt_rule);
+			IPACMDBG_H("hw-index-enable %d, counter %d\n",
+				IPACM_Iface::ipacmcfg->hw_fnr_stats_support,
+				IPACM_Iface::ipacmcfg->hw_counter_offset + UL_ALL);
+			flt_rule_entry->rule.enable_stats = 1;
+			flt_rule_entry->rule.cnt_idx = IPACM_Iface::ipacmcfg->hw_counter_offset + UL_ALL;
 		}
-#else
-		result = m_filtering.AddFilteringRule(flt_rule);
 #endif
 
-		if (result == false)
+		if (m_filtering.AddFilteringRule_v2(flt_rule) == false)
 		{
 			IPACMERR("Error Adding Filtering rule, aborting...\n");
-			free(flt_rule);
-			return IPACM_FAILURE;
+			ret = IPACM_FAILURE;
 		}
 		else
 		{
 			IPACM_Iface::ipacmcfg->increaseFltRuleCount(rx_prop->rx[0].src_pipe, IPA_IP_v6, 1);
-			ipv6_icmp_flt_rule_hdl[0] = flt_rule->rules[0].flt_rule_hdl;
+			ipv6_icmp_flt_rule_hdl[0] = flt_rule_entry->flt_rule_hdl;
 			IPACMDBG_H("IPv6 icmp filter rule HDL:0x%x\n", ipv6_icmp_flt_rule_hdl[0]);
-			free(flt_rule);
 		}
+		free(flt_rule_entry);
+		free(flt_rule);
 	}
-	return IPACM_SUCCESS;
+	return ret;
 }
 
 int IPACM_Lan::add_dummy_private_subnet_flt_rule(ipa_ip_type iptype)

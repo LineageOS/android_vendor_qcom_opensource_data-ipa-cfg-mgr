@@ -272,6 +272,10 @@ public:
 
 	int ResetClkVote(void);
 
+#ifdef IPA_IOCTL_GET_HW_FEATURE_SUPPORT
+	int GetIPAFeatureSupport(bool get = false);
+#endif
+
 	bool isEthBridgingSupported();
 
 	bool isIPAv3Supported();
@@ -376,6 +380,9 @@ private:
 	const char* DEFAULT_NAT_MEMTYPE = "DDR";
 
 	enum ipa_hw_type ver;
+#ifdef IPA_IOCTL_GET_HW_FEATURE_SUPPORT
+	uint32_t hw_feature;
+#endif
 	static IPACM_Config *pInstance;
 	static const char *DEVICE_NAME;
 	IPACM_Config(void);

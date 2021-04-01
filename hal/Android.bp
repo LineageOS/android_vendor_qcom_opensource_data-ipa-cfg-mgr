@@ -10,9 +10,7 @@ cc_library_shared {
     ],
 
     shared_libs: [
-        "libhwbinder",
         "libhidlbase",
-        "libhidltransport",
         "liblog",
         "libcutils",
         "libdl",

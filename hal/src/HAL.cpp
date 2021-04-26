@@ -89,13 +89,8 @@ HAL::HAL(IOffloadManager* mgr) : mLogs("HAL Function Calls", 50) {
 void HAL::registerAsSystemService(const char* name) {
     status_t ret = 0;
 
-    // Attempt to register 1.1 first
     ret = IOffloadControl::registerAsService();
-    if (ret != 0) {
-        // Fallback to using 1.0 if 1.1 HAL is not in manifst
-        ret = ::android::hardware::tetheroffload::control::V1_0::IOffloadControl::registerAsService();
-        if (ret != 0) ALOGE("Failed to register IOffloadControl (%d) name(%s)", ret, name);
-    }
+    if (ret != 0) ALOGE("Failed to register IOffloadControl (%d) name(%s)", ret, name);
     else if (DBG) {
         ALOGI("Successfully registered IOffloadControl");
     }

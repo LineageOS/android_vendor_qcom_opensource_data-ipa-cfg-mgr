@@ -1209,7 +1209,7 @@ void IPACM_Lan::store_downstream_state(bool up, enum ipa_ip_type iptype)
 			dev_name, IF_NAME_LEN);
 		IPACMDBG_H("Adding new tether iface :%s, State: UP\n", dev_name);
 	}
-	else if (free_index == -1)
+	else if (!state_update && free_index == -1)
 	{
 		IPACMERR("Exceeded max tether ifaces: not storing info for %s\n", dev_name);
 		return;

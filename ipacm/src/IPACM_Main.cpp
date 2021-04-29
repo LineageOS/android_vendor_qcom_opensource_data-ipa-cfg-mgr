@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2013-2019, The Linux Foundation. All rights reserved.
+Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -757,6 +757,18 @@ void* ipa_driver_msg_notifier(void *param)
 				OffloadMng->elrInstance->onLimitReached();
 			}
 			continue;
+#ifdef IPA_WARNING_LIMIT_EVENT_MAX
+		case IPA_WARNING_LIMIT_REACHED:
+			IPACMDBG_H("Received IPA_WARNING_LIMIT_REACHED\n");
+			OffloadMng = IPACM_OffloadManager::GetInstance();
+			if (OffloadMng->elrInstance == NULL) {
+				IPACMERR("OffloadMng->elrInstance is NULL, can't forward to framework!\n");
+			} else {
+				IPACMERR("calling OffloadMng->elrInstance->onWarningReached \n");
+				OffloadMng->elrInstance->onWarningReached();
+			}
+			continue;
+#endif
 		case IPA_SSR_BEFORE_SHUTDOWN:
 			IPACMDBG_H("Received IPA_SSR_BEFORE_SHUTDOWN\n");
 			IPACM_Wan::clearExtProp();

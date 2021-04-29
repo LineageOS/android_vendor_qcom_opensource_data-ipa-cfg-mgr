@@ -36,7 +36,7 @@
 #include <cutils/log.h>
 
 /* HIDL Includes */
-#include <android/hardware/tetheroffload/control/1.0/ITetheringOffloadCallback.h>
+#include <android/hardware/tetheroffload/control/1.1/ITetheringOffloadCallback.h>
 
 /* Internal Includes */
 #include "CtUpdateAmbassador.h"

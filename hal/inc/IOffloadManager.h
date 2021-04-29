@@ -120,6 +120,12 @@ public:
          * tether interface pairs when this callback is called.
          */
         virtual void onLimitReached(){}
+        /**
+         * Called when the warning set via setQuota has expired. It is expected
+         * that limit has not been reached yet.
+         *
+         */
+        virtual void onWarningReached(){}
     }; /* IpaEventListener */
 
     /**
@@ -326,6 +332,34 @@ public:
      *                        (via setUpstreamParameters)
      */
     virtual RET setQuota(const char* /* upstream */, uint64_t /* limit */) = 0;
+    /**
+     * This api replaces setQuota.
+     *
+     * Instruct hardware to stop forwarding traffic and send a callback after
+     * warning/limit bytes have been transferred in either direction on this upstream
+     * interface.
+     *
+     * Note that when one of the quota bytes is reached, the other one is still considered valid
+     * unless this method is called again with the same interface.
+     *
+     * @param upstream Upstream interface name that the limit should apply to
+     * @param warningBytes The quota of warning, defined as the number of bytes, starting from
+     *                     zero and counting from now.
+     * @param limitBytes The quota of limit, defined as the number of bytes, starting from zero
+     *                   and counting from now.
+     *
+     * @return SUCCESS If the limit was successfully applied
+     *         SUCCESS_OPTIMIZED If the limit was sufficiently high to be
+     *                           interpreted as "no quota".
+     *         FAIL_HARDWARE If the limit was rejected by the hardware
+     *         FAIL_UNSUPPORTED If metering is not supported on this interface
+     *         FAIL_TRY_AGAIN If this upstream has not been previously
+     *                        configured to allow offload
+     *                        (via setUpstreamParameters)
+     */
+    virtual RET setQuotaWarning(const char* /* upstream */,
+            uint64_t /* warningBytes */,
+            uint64_t /* limitBytes */) = 0;
     /**
      * Query for statistics counters in hardware.
      *

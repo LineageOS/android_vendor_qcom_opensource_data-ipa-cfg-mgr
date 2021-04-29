@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -83,8 +83,10 @@ public:
 
     /* ------------------------- STATS/POLICY --------------------------- */
     virtual RET setQuota(const char * /* upstream */, uint64_t /* limit */);
+    virtual RET setQuotaWarning(const char * /* upstream */,
+	uint64_t /* quota limit */, uint64_t /* warning limit */);
     virtual RET getStats(const char * /* upstream */, bool /* reset */,
-		OffloadStatistics& /* ret */);
+	OffloadStatistics& /* ret */);
 
 	static IPACM_OffloadManager *pInstance;
 

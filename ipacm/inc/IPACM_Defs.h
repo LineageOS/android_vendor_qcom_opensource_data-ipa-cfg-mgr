@@ -44,6 +44,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <fcntl.h>
 #include <linux/msm_ipa.h>
 #include "IPACM_Log.h"
+#include "linux/ipa_qmi_service_v01.h"
 
 #ifdef USE_GLIB
 #include <glib.h>
@@ -213,6 +214,7 @@ typedef enum
 	IPA_LAN_DELETE_SELF,                      /* ipacm_event_data_fid */
 	IPA_WIGIG_CLIENT_ADD_EVENT,               /* ipacm_event_data_mac_ep */
 	IPA_WIGIG_FST_SWITCH,                     /* ipacm_event_data_fst */
+	IPA_MOVE_NAT_TBL_EVENT,                   /* ipacm_event_move_nat */
 	IPACM_EVENT_MAX
 } ipa_cm_event_id;
 
@@ -394,6 +396,10 @@ typedef struct _ipacm_event_iface_up_tether
 	uint8_t xlat_mux_id;
 }ipacm_event_iface_up_tehter;
 
+typedef struct
+{
+	ipa_move_nat_type_enum_v01 nat_move_direction;
+}ipacm_event_move_nat;
 
 typedef struct _ipacm_ifacemgr_data
 {

@@ -305,6 +305,9 @@ void* ipa_driver_msg_notifier(void *param)
 #endif
 
 	param = NULL;
+	struct ipa_move_nat_req_msg_v01 *move_nat;
+	ipacm_event_move_nat *move_nat_data;
+
 	fd = open(IPA_DRIVER, O_RDWR);
 	if (fd < 0)
 	{
@@ -944,6 +947,23 @@ void* ipa_driver_msg_notifier(void *param)
 			evt_data.evt_data = mtu_event;
 			break;
 #endif
+
+		case IPA_MOVE_NAT_TABLE:
+			move_nat = (struct ipa_move_nat_req_msg_v01 *)(buffer + sizeof(struct ipa_msg_meta));
+			IPACMDBG_H("received IPA_MOVE_NAT_TABLE direction %s\n",
+				move_nat->nat_move_direction == QMI_IPA_MOVE_NAT_TO_DDR_V01 ? "TO_DDR" : "TO_SRAM");
+			move_nat_data = (ipacm_event_move_nat *)malloc(sizeof(ipacm_event_move_nat));
+			if(move_nat_data == NULL)
+			{
+				IPACMERR("unable to allocate memory for move_nat_tbl_evnt\n");
+				return NULL;
+			}
+
+			move_nat_data->nat_move_direction = move_nat->nat_move_direction;
+
+			evt_data.event = IPA_MOVE_NAT_TBL_EVENT;
+			evt_data.evt_data = move_nat_data;
+			break;
 
 		default:
 			IPACMDBG_H("Unhandled message type: %d\n", event_hdr.msg_type);

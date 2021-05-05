@@ -103,6 +103,7 @@ private:
 	void CheckSTAClient(const nat_table_entry *, bool *);
 	int CheckNatIface(ipacm_event_data_all *, bool *);
 	void HandleNonNatIPAddr(void *, bool);
+	void HandleNatTableMove(void *in_param);
 
 #ifdef CT_OPT
 	void ProcessCTV6Message(void *);

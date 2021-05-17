@@ -566,6 +566,7 @@ void IPACM_Wlan::event_callback(ipa_cm_event_id event, void *param)
 			{
 				IPACMDBG_H("Add downstream for IP iptype %d.\n", data->prefix.iptype);
 				is_downstream_set[data->prefix.iptype] = true;
+				store_downstream_state(true, data->prefix.iptype);
 				memcpy(&prefix[data->prefix.iptype], &data->prefix,
 					sizeof(prefix[data->prefix.iptype]));
 
@@ -616,7 +617,7 @@ void IPACM_Wlan::event_callback(ipa_cm_event_id event, void *param)
 			{
 				IPACMDBG_H("Del downstream for IP iptype %d.\n", data->prefix.iptype);
 				is_downstream_set[data->prefix.iptype] = false;
-
+				store_downstream_state(false, data->prefix.iptype);
 				if(is_upstream_set[data->prefix.iptype] == true)
 				{
 					IPACMDBG_H("Upstream was set before, deleting UL rules.\n");
@@ -1939,6 +1940,18 @@ int IPACM_Wlan::handle_down_evt()
 #endif
 	}
 	IPACMDBG_H("finished deleting wan filtering rules\n ");
+
+	if (is_downstream_set[IPA_IP_v4])
+	{
+		is_downstream_set[IPA_IP_v4] = false;
+		store_downstream_state(false, IPA_IP_v4);
+	}
+
+	if (is_downstream_set[IPA_IP_v6])
+	{
+		is_downstream_set[IPA_IP_v6] = false;
+		store_downstream_state(false, IPA_IP_v6);
+	}
 
 	/* Delete v4 filtering rules */
 	if (ip_type != IPA_IP_v6 && rx_prop != NULL)

@@ -80,9 +80,10 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define IPACM_FIREWALL_FILE_NAME    "mobileap_firewall.xml"
 #define IPACM_CFG_FILE_NAME    "IPACM_cfg.xml"
+#define IPACM_FILTER_CFG_FILE_NAME    "IPACM_Filter_cfg.xml"
 #ifdef FEATURE_IPA_ANDROID
 #define IPACM_PID_FILE "/data/vendor/ipa/ipacm.pid"
-#define IPACM_DIR_NAME     "/data"
+#define IPACM_DIR_NAME     "/data/vendor/ipa/"
 #else/* defined(FEATURE_IPA_ANDROID) */
 #define IPACM_PID_FILE "/etc/ipacm.pid"
 #define IPACM_DIR_NAME     "/etc"
@@ -146,8 +147,8 @@ void* netlink_start(void *param)
 	return NULL;
 }
 
-/* start firewall-rule monitor*/
-void* firewall_monitor(void *param)
+/* start Config change monitor*/
+void* cfg_change_monitor(void *param)
 {
 	int length;
 	int wd;
@@ -196,6 +197,7 @@ void* firewall_monitor(void *param)
 				{
 					IPACMDBG_H("The directory %s was 0x%x\n", event->name, event->mask);
 				}
+#ifndef FEATURE_IPA_ANDROID
 				else if (!strncmp(event->name, IPACM_FIREWALL_FILE_NAME, event->len)) // firewall_rule change
 				{
 					IPACMDBG_H("File \"%s\" was 0x%x\n", event->name, event->mask);
@@ -216,6 +218,33 @@ void* firewall_monitor(void *param)
 					evt_data.evt_data = NULL;
 
 					/* Insert IPA_FIREWALL_CHANGE_EVENT to command queue */
+					IPACM_EvtDispatcher::PostEvt(&evt_data);
+				}
+#endif
+				else if (!strncmp(event->name, IPACM_FILTER_CFG_FILE_NAME, event->len)) // IPACM Filter Config change
+				{
+					char IPACM_config_file[IPA_MAX_FILE_LEN];
+					IPACMDBG_H("File \"%s\" was 0x%x\n", event->name, event->mask);
+					IPACMDBG_H("The interested file %s .\n", IPACM_FILTER_CFG_FILE_NAME);
+
+					/* default fillter config is disable. */
+					memset(&IPACM_Iface::ipacmcfg->filter_config, 0,
+						sizeof(IPACM_Iface::ipacmcfg->filter_config));
+					strlcpy(IPACM_config_file, IPACM_FILTER_CFG_FILE, sizeof(IPACM_config_file));
+					if (IPACM_SUCCESS == IPACM_read_filter_cfg_xml(IPACM_config_file,
+						&IPACM_Iface::ipacmcfg->filter_config))
+					{
+						IPACMDBG_H("Filter XML read OK \n");
+					}
+					else
+					{
+						IPACMERR("Filter Config XML read failed, use default configuration \n");
+					}
+
+					evt_data.event = IPA_FILTER_CFG_CHANGE_EVENT;
+					evt_data.evt_data = NULL;
+
+					/* Insert IPA_FILTER_CFG_CHANGE_EVENT to command queue */
 					IPACM_EvtDispatcher::PostEvt(&evt_data);
 				}
 			}
@@ -1035,23 +1064,20 @@ int main(int argc, char **argv)
 		}
 	}
 
-	/* Enable Firewall support only on MDM targets */
-#ifndef FEATURE_IPA_ANDROID
 	if (IPACM_SUCCESS == monitor_thread)
 	{
-		ret = pthread_create(&monitor_thread, NULL, firewall_monitor, NULL);
+		ret = pthread_create(&monitor_thread, NULL, cfg_change_monitor, NULL);
 		if (IPACM_SUCCESS != ret)
 		{
 			IPACMERR("unable to create monitor thread\n");
 			return ret;
 		}
-		IPACMDBG_H("created firewall monitor thread\n");
-		if(pthread_setname_np(monitor_thread, "firewall cfg process") != 0)
+		IPACMDBG_H("created config change monitor thread\n");
+		if(pthread_setname_np(monitor_thread, "config change monitor") != 0)
 		{
 			IPACMERR("unable to set thread name\n");
 		}
 	}
-#endif
 
 	if (IPACM_SUCCESS == ipa_driver_thread)
 	{

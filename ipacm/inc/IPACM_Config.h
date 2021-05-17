@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2013-2020, The Linux Foundation. All rights reserved.
+Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -95,6 +95,9 @@ public:
 
 	/* Store private subnet configuration from XML file */
 	ipa_private_subnet private_subnet_table[IPA_MAX_PRIVATE_SUBNET_ENTRIES + IPA_MAX_MTU_ENTRIES];
+
+	/* Store Filter configuration. */
+	IPACM_filter_conf_t filter_config;
 
 	/* Store the non nat iface names */
 	NatIfaces *pNatIfaces;

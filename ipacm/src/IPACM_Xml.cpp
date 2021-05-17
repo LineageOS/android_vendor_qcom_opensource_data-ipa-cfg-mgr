@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2013, 2019-2020, The Linux Foundation. All rights reserved.
+Copyright (c) 2013, 2019-2021, The Linux Foundation. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -66,6 +66,12 @@ static int IPACM_firewall_xml_parse_tree
 (
 	 xmlNode* xml_node,
 	 IPACM_firewall_conf_t *config
+);
+
+static int IPACM_filter_cfg_xml_parse_tree
+(
+	 xmlNode* xml_node,
+	 IPACM_filter_conf_t *config
 );
 
 /*Reads content (stored as child) of the element */
@@ -610,7 +616,7 @@ static int IPACM_firewall_xml_parse_tree
 						memset(content_buf, 0, sizeof(content_buf));
 						memcpy(content_buf, (void *)content, str_size);
 						config->extd_firewall_entries[config->num_extd_firewall_entries - 1].ip_vsn
-							 = (firewall_ip_version_enum)atoi(content_buf);
+							 = (ip_version_enum)atoi(content_buf);
 						IPACMDBG_H("\n IP family type is %d \n",
 								config->extd_firewall_entries[config->num_extd_firewall_entries - 1].ip_vsn);
 					}
@@ -1220,3 +1226,739 @@ static int IPACM_firewall_xml_parse_tree
 	} /* end while */
 	return ret_val;
 }
+
+/* This function read Filter Cfg XML and populate the Filter Cfg */
+int IPACM_read_filter_cfg_xml(char *xml_file, IPACM_filter_conf_t *config)
+{
+	xmlDocPtr doc = NULL;
+	xmlNode* root = NULL;
+	int ret_val;
+
+	IPACM_ASSERT(xml_file != NULL);
+	IPACM_ASSERT(config != NULL);
+
+	/* invoke the XML parser and obtain the parse tree */
+	doc = xmlReadFile(xml_file, "UTF-8", XML_PARSE_NOBLANKS);
+	if (doc == NULL) {
+		IPACMDBG_H("IPACM_xml_parse: libxml returned parse error\n");
+		return IPACM_FAILURE;
+	}
+	/*get the root of the tree*/
+	root = xmlDocGetRootElement(doc);
+
+	/* parse the xml tree returned by libxml*/
+	ret_val = IPACM_filter_cfg_xml_parse_tree(root, config);
+
+	if (ret_val != IPACM_SUCCESS)
+	{
+		IPACMDBG_H("IPACM_xml_parse: IPACM_filter_cfg_xml_parse_tree returned parse error!\n");
+	}
+
+	/* free the tree */
+	xmlFreeDoc(doc);
+
+	return ret_val;
+}
+
+/* This function traverses the filter cfg xml tree */
+static int IPACM_filter_cfg_xml_parse_tree
+(
+	 xmlNode* xml_node,
+	 IPACM_filter_conf_t *config
+)
+{
+	int mask_value_v6, mask_index;
+	int32_t ret_val = IPACM_SUCCESS;
+	char *content;
+	int str_size;
+	char content_buf[MAX_XML_STR_LEN];
+	struct in6_addr ip6_addr;
+
+	IPACM_ASSERT(config != NULL);
+
+	if (NULL == xml_node)
+		return ret_val;
+
+	while ( xml_node != NULL )
+	{
+		switch (xml_node->type)
+		{
+
+		case XML_ELEMENT_NODE:
+			{
+				if (0 == IPACM_util_icmp_string((char*)xml_node->name, system_TAG) ||
+						0 == IPACM_util_icmp_string((char*)xml_node->name, FilterCfg_TAG) ||
+						0 == IPACM_util_icmp_string((char*)xml_node->name, FilterEntry_TAG) ||
+						0 == IPACM_util_icmp_string((char*)xml_node->name, FilterEnabled_TAG)  ||
+						0 == IPACM_util_icmp_string((char*)xml_node->name, FilterDLAck_TAG))
+				{
+					if (0 == IPACM_util_icmp_string((char*)xml_node->name, FilterEntry_TAG))
+					{
+						/* increase Filter Config entry num */
+						config->num_filter_cfg_entries++;
+					}
+
+					if (0 == IPACM_util_icmp_string((char*)xml_node->name, FilterEnabled_TAG))
+					{
+						/* setup action of matched rules */
+						content = IPACM_read_content_element(xml_node);
+						if (content)
+						{
+								str_size = strlen(content);
+								memset(content_buf, 0, sizeof(content_buf));
+								memcpy(content_buf, (void *)content, str_size);
+							if (atoi(content_buf)==1)
+							{
+								config->filter_enable = true;
+							}
+							else
+							{
+								config->filter_enable = false;
+							}
+							IPACMDBG_H(" Filter Config Enabled :%d\n",config->filter_enable);
+						}
+						}
+
+					if (0 == IPACM_util_icmp_string((char*)xml_node->name, FilterDLAck_TAG))
+					{
+						/* setup if DL Ack filtering enabled or not */
+						content = IPACM_read_content_element(xml_node);
+						if (content)
+						{
+								str_size = strlen(content);
+								memset(content_buf, 0, sizeof(content_buf));
+								memcpy(content_buf, (void *)content, str_size);
+							if (atoi(content_buf)==1)
+							{
+								config->dl_ack_filter_enable = true;
+							}
+								else
+							{
+								config->dl_ack_filter_enable = false;
+							}
+							IPACMDBG_H(" DL Ack Filtering Enabled:%d\n", config->dl_ack_filter_enable);
+							}
+					}
+					/* go to child */
+					ret_val = IPACM_filter_cfg_xml_parse_tree(xml_node->children, config);
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, IPFamily_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].ip_vsn
+							 = (ip_version_enum)atoi(content_buf);
+						IPACMDBG_H("\n IP family type is %d \n",
+								config->filter_cfg_entries[config->num_filter_cfg_entries - 1].ip_vsn);
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, IPV4SourceAddress_TAG))
+				{
+					config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.attrib_mask |= IPA_FLT_SRC_ADDR;
+					/* go to child */
+					ret_val = IPACM_filter_cfg_xml_parse_tree(xml_node->children, config);
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, IPV4SourceIPAddress_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						content_buf[MAX_XML_STR_LEN-1] = '\0';
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v4.src_addr
+							 = ntohl(inet_addr(content_buf));
+						IPACMDBG_H("IPv4 source address is: %s \n", content_buf);
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, IPV4SourceSubnetMask_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						content_buf[MAX_XML_STR_LEN-1] = '\0';
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v4.src_addr_mask
+							 = ntohl(inet_addr(content_buf));
+						IPACMDBG_H("IPv4 source subnet mask is: %s \n", content_buf);
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, IPV4DestinationAddress_TAG))
+				{
+					config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.attrib_mask |= IPA_FLT_DST_ADDR;
+					/* go to child */
+					ret_val = IPACM_filter_cfg_xml_parse_tree(xml_node->children, config);
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, IPV4DestinationIPAddress_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						content_buf[MAX_XML_STR_LEN-1] = '\0';
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v4.dst_addr
+							 = ntohl(inet_addr(content_buf));
+						IPACMDBG_H("IPv4 destination address is: %s \n", content_buf);
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, IPV4DestinationSubnetMask_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						content_buf[MAX_XML_STR_LEN-1] = '\0';
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v4.dst_addr_mask
+							= ntohl(inet_addr(content_buf));
+						IPACMDBG_H("IPv4 destination subnet mask is: %s \n", content_buf);
+						}
+					}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, IPV4TypeOfService_TAG))
+				{
+					config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.attrib_mask |= IPA_FLT_TOS;
+					/* go to child */
+					ret_val = IPACM_filter_cfg_xml_parse_tree(xml_node->children, config);
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, TOSValue_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v4.tos
+							 = atoi(content_buf);
+						// Here we do not know if it is TOS with mask or not, so we put at both places
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.tos_value
+							= atoi(content_buf);
+						IPACMDBG_H("\n IPV4 TOS val is %d \n",
+										 config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v4.tos);
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, TOSMask_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						uint8_t mask;
+
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						mask = atoi(content_buf);
+						IPACMDBG_H("\n IPv4 TOS mask is %u \n", mask);
+						if (mask != 0xFF) {
+							// TOS attribute cannot be used
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v4.tos = 0;
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.tos_mask = mask;
+
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.attrib_mask |=
+								IPA_FLT_TOS_MASKED;
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.attrib_mask &=
+								~IPA_FLT_TOS;
+						} else {
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.tos_value = 0;
+						}
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, IPV4NextHeaderProtocol_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.attrib_mask |= IPA_FLT_PROTOCOL;
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v4.protocol = atoi(content_buf);
+						IPACMDBG_H("\n IPv4 next header prot is %d \n",
+								 config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v4.protocol);
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, IPV6SourceAddress_TAG))
+				{
+					config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.attrib_mask |=
+						 IPA_FLT_SRC_ADDR;
+					/* go to child */
+					ret_val = IPACM_filter_cfg_xml_parse_tree(xml_node->children, config);
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, IPV6SourceIPAddress_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						inet_pton(AF_INET6, content_buf, &ip6_addr);
+						memcpy(config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.src_addr,
+									 ip6_addr.s6_addr, IPACM_IPV6_ADDR_LEN * sizeof(uint8_t));
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.src_addr[0]=ntohl(config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.src_addr[0]);
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.src_addr[1]=ntohl(config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.src_addr[1]);
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.src_addr[2]=ntohl(config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.src_addr[2]);
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.src_addr[3]=ntohl(config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.src_addr[3]);
+
+						IPACMDBG_H("\n ipv6 source addr is %d \n ",
+								config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.src_addr[0]);
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, IPV6SourcePrefix_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						mask_value_v6 = atoi(content_buf);
+						for (mask_index = 0; mask_index < 4; mask_index++)
+						{
+							if (mask_value_v6 >= 32)
+							{
+								mask_v6(32, &(config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.src_addr_mask[mask_index]));
+								mask_value_v6 -= 32;
+							}
+							else
+							{
+								mask_v6(mask_value_v6, &(config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.src_addr_mask[mask_index]));
+								mask_value_v6 = 0;
+							}
+						}
+						IPACMDBG_H("\n ipv6 source prefix is %d \n", atoi(content_buf));
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, IPV6DestinationAddress_TAG))
+				{
+					config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.attrib_mask |=
+						 IPA_FLT_DST_ADDR;
+					/* go to child */
+					ret_val = IPACM_filter_cfg_xml_parse_tree(xml_node->children, config);
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, IPV6DestinationIPAddress_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						inet_pton(AF_INET6, content_buf, &ip6_addr);
+						memcpy(config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.dst_addr,
+									 ip6_addr.s6_addr, IPACM_IPV6_ADDR_LEN * sizeof(uint8_t));
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.dst_addr[0]=ntohl(config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.dst_addr[0]);
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.dst_addr[1]=ntohl(config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.dst_addr[1]);
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.dst_addr[2]=ntohl(config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.dst_addr[2]);
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.dst_addr[3]=ntohl(config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.dst_addr[3]);
+						IPACMDBG_H("\n ipv6 dest addr is %d \n",
+								 config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.dst_addr[0]);
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, IPV6DestinationPrefix_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						mask_value_v6 = atoi(content_buf);
+						for (mask_index = 0; mask_index < 4; mask_index++)
+						{
+							if (mask_value_v6 >= 32)
+							{
+								mask_v6(32, &(config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.dst_addr_mask[mask_index]));
+								mask_value_v6 -= 32;
+							}
+							else
+							{
+								mask_v6(mask_value_v6, &(config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.dst_addr_mask[mask_index]));
+								mask_value_v6 = 0;
+							}
+						}
+						IPACMDBG_H("\n ipv6 dest prefix is %d \n", atoi(content_buf));
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, IPV6TrafficClass_TAG))
+				{
+					config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.attrib_mask |= IPA_FLT_TC;
+					/* go to child */
+					ret_val = IPACM_filter_cfg_xml_parse_tree(xml_node->children, config);
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, TrfClsValue_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.tc
+							 = atoi(content_buf);
+						IPACMDBG_H("\n ipv6 trf class val is %d \n",
+								 config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.tc);
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, TrfClsMask_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.tc
+							 &= atoi(content_buf);
+						IPACMDBG_H("\n ipv6 trf class mask is %d \n", atoi(content_buf));
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, IPV6NextHeaderProtocol_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.attrib_mask |= IPA_FLT_NEXT_HDR;
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.next_hdr
+							 = atoi(content_buf);
+						IPACMDBG_H("\n ipv6 next header protocol is %d \n",
+								 config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.u.v6.next_hdr);
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, TCPSource_TAG))
+				{
+					/* go to child */
+					ret_val = IPACM_filter_cfg_xml_parse_tree(xml_node->children, config);
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, TCPSourcePort_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port
+							 = atoi(content_buf);
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, TCPSourceRange_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						if (atoi(content_buf) != 0)
+						{
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.attrib_mask |= IPA_FLT_SRC_PORT_RANGE;
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port_lo
+								= config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port;
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port_hi
+								= config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port + atoi(content_buf);
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port = 0;
+							IPACMDBG_H("\n tcp source port from %d to %d \n",
+									config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port_lo,
+									config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port_hi);
+						}
+						else
+						{
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.attrib_mask |= IPA_FLT_SRC_PORT;
+							IPACMDBG_H("\n tcp source port= %d \n",
+									config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port);
+						}
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, TCPDestination_TAG))
+				{
+					/* go to child */
+					ret_val = IPACM_filter_cfg_xml_parse_tree(xml_node->children, config);
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, TCPDestinationPort_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port
+							 = atoi(content_buf);
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, TCPDestinationRange_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						if(atoi(content_buf)!=0)
+						{
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.attrib_mask |= IPA_FLT_DST_PORT_RANGE;
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port_lo
+								= config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port;
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port_hi
+								= config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port + atoi(content_buf);
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port = 0;
+							IPACMDBG_H("\n tcp dest port from %d to %d \n",
+									config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port_lo,
+									config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port_hi);
+						}
+						else
+						{
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.attrib_mask |= IPA_FLT_DST_PORT;
+							IPACMDBG_H("\n tcp dest port= %d \n",
+									config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port);
+						}
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, UDPSource_TAG))
+				{
+					/* go to child */
+					ret_val = IPACM_filter_cfg_xml_parse_tree(xml_node->children, config);
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, UDPSourcePort_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port
+							 = atoi(content_buf);
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, UDPSourceRange_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						if(atoi(content_buf)!=0)
+						{
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.attrib_mask |= IPA_FLT_SRC_PORT_RANGE;
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port_lo
+								= config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port;
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port_hi
+								= config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port + atoi(content_buf);
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port = 0;
+							IPACMDBG_H("\n udp source port from %d to %d \n",
+									config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port_lo,
+									config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port_hi);
+						}
+						else
+						{
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.attrib_mask |= IPA_FLT_SRC_PORT;
+							IPACMDBG_H("\n udp source port= %d \n",
+									config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port);
+						}
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, UDPDestination_TAG))
+				{
+					/* go to child */
+					ret_val = IPACM_filter_cfg_xml_parse_tree(xml_node->children, config);
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, UDPDestinationPort_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port
+							 = atoi(content_buf);
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, UDPDestinationRange_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						if(atoi(content_buf)!=0)
+						{
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.attrib_mask |= IPA_FLT_DST_PORT_RANGE;
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port_lo
+								= config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port;
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port_hi
+								= config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port + atoi(content_buf);
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port = 0;
+							IPACMDBG_H("\n UDP dest port from %d to %d \n",
+									config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port_lo,
+									config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port_hi);
+						}
+						else
+						{
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.attrib_mask |= IPA_FLT_DST_PORT;
+							IPACMDBG_H("\n UDP dest port= %d \n",
+									config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port);
+						}
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, ICMPType_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.type = atoi(content_buf);
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.attrib_mask |= IPA_FLT_TYPE;
+						IPACMDBG_H("\n icmp type is %d \n",
+								 config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.type);
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, ICMPCode_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.code = atoi(content_buf);
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.attrib_mask |= IPA_FLT_CODE;
+						IPACMDBG_H("\n icmp code is %d \n",
+								 config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.code);
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, ESPSPI_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.spi = atoi(content_buf);
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.attrib_mask |= IPA_FLT_SPI;
+						IPACMDBG_H("\n esp spi is %d \n",
+								config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.spi);
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, TCP_UDPSource_TAG))
+				{
+					/* go to child */
+					ret_val = IPACM_filter_cfg_xml_parse_tree(xml_node->children, config);
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, TCP_UDPSourcePort_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content,str_size);
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port
+							 = atoi(content_buf);
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, TCP_UDPSourceRange_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						if(atoi(content_buf)!=0)
+						{
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.attrib_mask |= IPA_FLT_SRC_PORT_RANGE;
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port_lo
+								= config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port;
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port_hi
+								= config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port + atoi(content_buf);
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port = 0;
+							IPACMDBG_H("\n tcp_udp source port from %d to %d \n",
+									config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port_lo,
+									config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port_hi);
+						}
+						else
+						{
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.attrib_mask |= IPA_FLT_SRC_PORT;
+							IPACMDBG_H("\n tcp_udp source port= %d \n",
+									config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.src_port);
+
+						}
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, TCP_UDPDestination_TAG))
+				{
+					ret_val = IPACM_filter_cfg_xml_parse_tree(xml_node->children, config);
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, TCP_UDPDestinationPort_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port
+							 = atoi(content_buf);
+					}
+				}
+				else if (0 == IPACM_util_icmp_string((char*)xml_node->name, TCP_UDPDestinationRange_TAG))
+				{
+					content = IPACM_read_content_element(xml_node);
+					if (content)
+					{
+						str_size = strlen(content);
+						memset(content_buf, 0, sizeof(content_buf));
+						memcpy(content_buf, (void *)content, str_size);
+						if(atoi(content_buf)!=0)
+						{
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.attrib_mask |= IPA_FLT_DST_PORT_RANGE;
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port_lo
+								= config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port;
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port_hi
+								= config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port + atoi(content_buf);
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port = 0;
+							IPACMDBG_H("\n tcp_udp dest port from %d to %d \n",
+								config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port_lo,
+								config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port_hi);
+						}
+						else
+						{
+							config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.attrib_mask |= IPA_FLT_DST_PORT;
+							IPACMDBG_H("\n tcp_udp dest port= %d \n",
+									config->filter_cfg_entries[config->num_filter_cfg_entries - 1].attrib.dst_port);
+						}
+					}
+				}
+			}
+			break;
+
+		default:
+			break;
+		}
+		/* go to sibling */
+		xml_node = xml_node->next;
+	} /* end while */
+	return ret_val;
+}
+

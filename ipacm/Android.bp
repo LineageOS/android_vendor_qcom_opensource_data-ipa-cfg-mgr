@@ -70,3 +70,12 @@ prebuilt_etc {
     src: "src/IPACM_cfg.xml",
 
 }
+
+prebuilt_etc {
+    name: "IPACM_Filter_cfg.xml",
+
+    vendor: true,
+    owner: "ipacm",
+    src: "src/IPACM_Filter_cfg.xml",
+
+}

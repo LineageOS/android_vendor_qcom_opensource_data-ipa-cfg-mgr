@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2013-2020, The Linux Foundation. All rights reserved.
+Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -53,6 +53,7 @@ const char *ipacm_event_name[] = {
 	__stringify(IPA_CFG_CHANGE_EVENT),                     /* NULL */
 	__stringify(IPA_PRIVATE_SUBNET_CHANGE_EVENT),          /* ipacm_event_data_fid */
 	__stringify(IPA_FIREWALL_CHANGE_EVENT),                /* NULL */
+	__stringify(IPA_FILTER_CFG_CHANGE_EVENT),              /* NULL */
 	__stringify(IPA_LINK_UP_EVENT),                        /* ipacm_event_data_fid */
 	__stringify(IPA_LINK_DOWN_EVENT),                      /* ipacm_event_data_fid */
 	__stringify(IPA_USB_LINK_UP_EVENT),                    /* ipacm_event_data_fid */
@@ -347,6 +348,18 @@ int IPACM_Config::Init(void)
 		free(iface_table);
 		free(alg_table);
 		goto fail;
+	}
+
+	/* default fillter config is disable. */
+	memset(&filter_config, 0, sizeof(filter_config));
+	strlcpy(IPACM_config_file, IPACM_FILTER_CFG_FILE, sizeof(IPACM_config_file));
+	if (IPACM_SUCCESS == IPACM_read_filter_cfg_xml(IPACM_config_file, &filter_config))
+	{
+		IPACMDBG_H("Filter XML read OK \n");
+	}
+	else
+	{
+		IPACMERR("Filter Config XML read failed, use default configuration \n");
 	}
 
 	/* Construct the routing table ictol name in iface static member*/

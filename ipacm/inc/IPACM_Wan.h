@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2013-2020, The Linux Foundation. All rights reserved.
+Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -63,6 +63,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define NETWORK_STATS "%s %llu %llu %llu %llu"
 #define IPA_NETWORK_STATS_FILE_NAME "/data/misc/ipa/network_stats"
+#define IPA_OFFLOAD_TETHER_STATE_FILE_NAME "/data/vendor/ipa/offload_state"
 
 typedef struct _wan_client_rt_hdl
 {
@@ -638,6 +639,10 @@ private:
 
 	/* configure the initial firewall filter rules */
 	int config_dft_firewall_rules_ex(struct ipa_flt_rule_add* rules, int rule_offset,
+		ipa_ip_type iptype);
+
+	/* configure dl ack rule if enabled. */
+	int config_filter_dl_ack_rule_ex(struct ipa_flt_rule_add *rules, int rule_offset,
 		ipa_ip_type iptype);
 
 	/* init filtering rule in wan dl filtering table */

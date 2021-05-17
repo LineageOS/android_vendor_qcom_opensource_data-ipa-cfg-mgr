@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2013-2019, The Linux Foundation. All rights reserved.
+Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -63,6 +63,20 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define PIPE_STATS "%s %s %llu %llu %llu %llu"
 #define IPA_PIPE_STATS_FILE_NAME "/data/misc/ipa/tether_stats"
+#define IPA_DOWNSTREAM_TETHER_STATE_FILE_NAME "/data/vendor/ipa/downstream_state"
+/* Max tether interfaces: rndis0/wlan0/wlan1 */
+#define IPA_MAX_TETHER_IFACE_ENTRIES 3
+
+/* Down Stream information. */
+struct ipa_lan_downstream_info
+{
+	/* IPACM interface name */
+	char dev_name[IF_NAME_LEN];
+	/* Down Stream state */
+	bool downstream_state;
+	/* Bool indicating entry in use. */
+	bool entry_in_use;
+};
 
 /* store each lan-iface unicast routing rule and its handler*/
 struct ipa_lan_rt_rule
@@ -115,8 +129,16 @@ public:
 	/* store private-subnet filter rule handlers */
 	uint32_t private_fl_rule_hdl[IPA_MAX_PRIVATE_SUBNET_ENTRIES + IPA_MAX_MTU_ENTRIES];
 
+	/* store filter cfg rule handles */
+	uint32_t filter_cfg_rule_hdl[IPA_MAX_FILTER_CFG_ENTRIES];
+
+	/* store downstream information */
+	static struct ipa_lan_downstream_info downstream_info[IPA_MAX_TETHER_IFACE_ENTRIES];
+
 	/* LAN-iface's callback function */
 	void event_callback(ipa_cm_event_id event, void *data);
+
+	virtual void store_downstream_state(bool up, enum ipa_ip_type iptype);
 
 	virtual int handle_wan_up(ipa_ip_type ip_type);
 
@@ -229,6 +251,10 @@ protected:
 	int handle_private_subnet_android(ipa_ip_type iptype);
 
 	int reset_to_dummy_flt_rule(ipa_ip_type iptype, uint32_t rule_hdl);
+
+	int handle_filter_cfg_update(ipa_ip_type iptype);
+
+	int add_dummy_filter_cfg_rules(ipa_ip_type iptype);
 
 	virtual int modify_ipv6_prefix_flt_rule(uint32_t* prefix);
 

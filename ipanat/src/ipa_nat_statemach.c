@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -111,7 +111,9 @@
  */
 static ipa_nati_obj nati_obj = {
 	.prev_state          = NATI_STATE_NULL,
-	.curr_state          = NATI_STATE_DDR_ONLY,
+	.curr_state          = NATI_STATE_NULL,
+	.hold_state          = false,
+	.state_to_hold       = NATI_STATE_NULL,
 	.ddr_tbl_hdl         = 0,
 	.sram_tbl_hdl        = 0,
 	.tot_slots_in_sram   = 0,
@@ -187,6 +189,53 @@ bail:
 }
 
 /*
+ * Function for taking/locking the mutex...
+ */
+static int take_mutex()
+{
+	int ret;
+
+	if ( nat_mutex_init )
+	{
+again:
+		ret = pthread_mutex_lock(&nat_mutex);
+	}
+	else
+	{
+		ret = mutex_init();
+
+		if ( ret == 0 )
+		{
+			goto again;
+		}
+	}
+
+	if ( ret != 0 )
+	{
+		IPAERR("Unable to lock the %s nat mutex\n",
+			   (nat_mutex_init) ? "initialized" : "uninitialized");
+	}
+
+	return ret;
+}
+
+/*
+ * Function for giving/unlocking the mutex...
+ */
+static int give_mutex()
+{
+	int ret = (nat_mutex_init) ? pthread_mutex_unlock(&nat_mutex) : -1;
+
+	if ( ret != 0 )
+	{
+		IPAERR("Unable to unlock the %s nat mutex\n",
+			   (nat_mutex_init) ? "initialized" : "uninitialized");
+	}
+
+	return ret;
+}
+
+/*
  * ****************************************************************************
  *
  * HIJACKED API FUNCTIONS START HERE
@@ -203,21 +252,12 @@ int ipa_nati_add_ipv4_tbl(
 		.public_ip_addr    = public_ip_addr,
 		.number_of_entries = number_of_entries,
 		.tbl_hdl           = tbl_hdl,
+		.mem_type_ptr      = mem_type_ptr,
 	};
 
 	int ret;
 
 	IPADBG("In\n");
-
-	/*
-	 * If first time in here, then let XML drive initial state...
-	 */
-	if (nati_obj.prev_state == NATI_STATE_NULL)
-	{
-		SET_NATIOBJ_STATE(
-			&nati_obj,
-			mem_type_str_to_ipa_nati_state(mem_type_ptr));
-	}
 
 	ret = ipa_nati_statemach(&nati_obj, NATI_TRIG_ADD_TABLE, (void*) &args);
 
@@ -388,26 +428,141 @@ int ipa_nati_query_timestamp(
 }
 
 int ipa_nat_switch_to(
-	enum ipa3_nat_mem_in nmi )
+	enum ipa3_nat_mem_in nmi,
+	bool                 hold_state )
 {
-	int ret = 0;
+	int ret = -1;
 
-	IPADBG("In\n");
+	IPADBG("In - current state %s\n",
+		   ipa_nati_state_as_str(nati_obj.curr_state));
 
-	if ( ! IPA_VALID_NAT_MEM_IN(nmi) || ! IN_HYBRID_STATE() )
+	if ( ! IPA_VALID_NAT_MEM_IN(nmi) )
 	{
-		IPAERR("Bad nmi(%s) and/or not in hybrid state\n",
-			   ipa3_nat_mem_in_as_str(nmi));
+		IPAERR("Bad nmi(%s)\n", ipa3_nat_mem_in_as_str(nmi));
+
 		ret = -1;
+
 		goto bail;
 	}
 
-	if ( (nmi == IPA_NAT_MEM_IN_SRAM && nati_obj.curr_state == NATI_STATE_HYBRID_DDR)
-		 ||
-		 (nmi == IPA_NAT_MEM_IN_DDR  && nati_obj.curr_state == NATI_STATE_HYBRID) )
+	ret = take_mutex();
+
+	if ( ret != 0 )
 	{
-		ret = ipa_nati_statemach(&nati_obj, NATI_TRIG_TBL_SWITCH, 0);
+		goto bail;
 	}
+
+	/*
+	 * Are we here before the state machine has been started?
+	 */
+	if ( IN_UNSTARTED_STATE() )
+	{
+		nati_obj.hold_state = hold_state;
+
+		nati_obj.state_to_hold =
+			(nmi == IPA_NAT_MEM_IN_DDR) ?
+			NATI_STATE_DDR_ONLY         :
+			NATI_STATE_SRAM_ONLY;
+
+		IPADBG(
+			"Initial state will be %s before table init and it %s be held\n",
+			ipa_nati_state_as_str(nati_obj.state_to_hold),
+			(hold_state) ? "will" : "will not");
+
+		ret = 0;
+
+		goto unlock;
+	}
+
+	/*
+	 * Are we here after we've already started in hybrid state?
+	 */
+	if ( IN_HYBRID_STATE() )
+	{
+		ret = 0;
+
+		if ( COMPATIBLE_NMI_4SWITCH(nmi) )
+		{
+			ret = ipa_nati_statemach(&nati_obj, NATI_TRIG_TBL_SWITCH, 0);
+		}
+
+		if ( ret == 0 )
+		{
+			nati_obj.hold_state = hold_state;
+
+			if ( hold_state )
+			{
+				nati_obj.state_to_hold = GEN_HOLD_STATE();
+			}
+
+			IPADBG(
+				"Current state is %s and it %s be held\n",
+				ipa_nati_state_as_str(nati_obj.curr_state),
+				(hold_state) ? "will" : "will not");
+		}
+
+		goto unlock;
+	}
+
+	/*
+	 * We've gotten here because we're not in an unstarted state, nor
+	 * are we in hybrid state. This means we're either in
+	 * NATI_STATE_DDR_ONLY or NATI_STATE_SRAM_ONLY
+	 *
+	 * Let's see what's being attempted and if it's OK...
+	 */
+	if ( hold_state )
+	{
+		if ( COMPATIBLE_NMI_4SWITCH(nmi) )
+		{
+			/*
+			 * If we've gotten here, it means that the requested nmi,
+			 * the current state, and the hold are compatible...
+			 */
+			nati_obj.state_to_hold = GEN_HOLD_STATE();
+			nati_obj.hold_state    = hold_state;
+
+			IPADBG(
+				"Requesting to hold memory type %s at "
+				"current state %s will be done\n",
+				ipa3_nat_mem_in_as_str(nmi),
+				ipa_nati_state_as_str(nati_obj.curr_state));
+
+			ret = 0;
+
+			goto unlock;
+		}
+		else
+		{
+			/*
+			 * The requested nmi, the current state, and the hold are
+			 * not compatible...
+			 */
+			IPAERR(
+				"Requesting to hold memory type %s and "
+				"current state %s are incompatible\n",
+				ipa3_nat_mem_in_as_str(nmi),
+				ipa_nati_state_as_str(nati_obj.curr_state));
+
+			ret = -1;
+
+			goto unlock;
+		}
+	}
+
+	/*
+	 * If we've gotten here, it's because the holding of state is no
+	 * longer desired...
+	 */
+	nati_obj.state_to_hold = NATI_STATE_NULL;
+	nati_obj.hold_state    = hold_state;
+
+	IPADBG("Holding of state is no longer desired\n");
+
+	ret = 0;
+
+unlock:
+	ret = give_mutex();
 
 bail:
 	IPADBG("Out\n");
@@ -670,6 +825,69 @@ static int _smDelTbl(
 	IPADBG("tbl_hdl(0x%08X)\n", tbl_hdl);
 
 	ret = ipa_NATI_del_ipv4_table(tbl_hdl);
+
+	if ( ret == 0 && ! IN_HYBRID_STATE() )
+	{
+		/*
+		 * The following will create the preferred "initial state" for
+		 * restart...
+		 */
+		BACK2_UNSTARTED_STATE();
+	}
+
+	IPADBG("Out\n");
+
+	return ret;
+}
+
+/******************************************************************************/
+/*
+ * FUNCTION: _smFirstTbl
+ *
+ * PARAMS:
+ *
+ *   nati_obj_ptr (IN) A pointer to an initialized nati object
+ *
+ *   trigger      (IN) The trigger to run through the state machine
+ *
+ *   arb_data_ptr (IN) Whatever you like
+ *
+ * DESCRIPTION:
+ *
+ *   The following will cause the creation of the very first NAT table(s)
+ *   before any others have ever been created...
+ *
+ * RETURNS:
+ *
+ *   zero on success, otherwise non-zero
+ */
+static int _smFirstTbl(
+	ipa_nati_obj*    nati_obj_ptr,
+	ipa_nati_trigger trigger,
+	void*           arb_data_ptr )
+{
+	table_add_args* args = (table_add_args*) arb_data_ptr;
+
+	uint32_t  public_ip_addr    = args->public_ip_addr;
+	uint16_t  number_of_entries = args->number_of_entries;
+	uint32_t* tbl_hdl_ptr       = args->tbl_hdl;
+	const char* mem_type_ptr    = args->mem_type_ptr;
+
+	int ret;
+
+	IPADBG("In\n");
+
+	/*
+	 * This is the first time in here.  Let the ipacm's XML config (or
+	 * state_to_hold) drive initial state...
+	 */
+	SET_NATIOBJ_STATE(
+		nati_obj_ptr,
+		(nati_obj_ptr->hold_state && nati_obj_ptr->state_to_hold) ?
+		nati_obj_ptr->state_to_hold                               :
+		mem_type_str_to_ipa_nati_state(mem_type_ptr));
+
+	ret = ipa_nati_statemach(nati_obj_ptr, NATI_TRIG_ADD_TABLE, arb_data_ptr);
 
 	IPADBG("Out\n");
 
@@ -985,6 +1203,15 @@ static int _smDelSramAndDdrTbl(
 		};
 
 		ret = _smDelTbl(nati_obj_ptr, trigger, (void*) &new_args);
+	}
+
+	if ( ret == 0 )
+	{
+		/*
+		 * The following will create the preferred "initial state" for
+		 * restart...
+		 */
+		BACK2_UNSTARTED_STATE();
 	}
 
 	IPADBG("Out\n");
@@ -1514,7 +1741,9 @@ static int _smAddRuleHybrid(
 	}
 	else
 	{
-		if ( nati_obj_ptr->curr_state == NATI_STATE_HYBRID )
+		if ( nati_obj_ptr->curr_state == NATI_STATE_HYBRID
+			 &&
+			 ! nati_obj_ptr->hold_state )
 		{
 			/*
 			 * In hybrid mode, we always start in SRAM...hence
@@ -1645,7 +1874,9 @@ static int _smDelRuleHybrid(
 			 */
 			uint32_t* cnt_ptr = CHOOSE_CNTR();
 
-			if ( *cnt_ptr <= nati_obj_ptr->back_to_sram_thresh )
+			if ( *cnt_ptr <= nati_obj_ptr->back_to_sram_thresh
+				 &&
+				 ! nati_obj_ptr->hold_state )
 			{
 				/*
 				 * The following will focus us on SRAM and cause the copy
@@ -1807,7 +2038,9 @@ static int _smSwitchFromDdrToSram(
 
 	uint64_t           start, stop;
 
-	int stats_ret, ret;
+	int                stats_ret, ret;
+
+	bool               collect_stats = (bool) arb_data_ptr;
 
 	UNUSED(cnt_ptr);
 	UNUSED(trigger);
@@ -1815,8 +2048,10 @@ static int _smSwitchFromDdrToSram(
 
 	IPADBG("In\n");
 
-	stats_ret = ipa_NATI_ipv4_tbl_stats(
-		nati_obj_ptr->ddr_tbl_hdl, &nat_stats, &idx_stats);
+	stats_ret = (collect_stats) ?
+		ipa_NATI_ipv4_tbl_stats(
+			nati_obj_ptr->ddr_tbl_hdl, &nat_stats, &idx_stats) :
+		-1;
 
 	currTimeAs(TimeAsNanSecs, &start);
 
@@ -1979,7 +2214,9 @@ static int _smSwitchFromSramToDdr(
 
 	uint64_t           start, stop;
 
-	int stats_ret, ret;
+	int                stats_ret, ret;
+
+	bool               collect_stats = (bool) arb_data_ptr;
 
 	UNUSED(cnt_ptr);
 	UNUSED(trigger);
@@ -1987,8 +2224,10 @@ static int _smSwitchFromSramToDdr(
 
 	IPADBG("In\n");
 
-	stats_ret = ipa_NATI_ipv4_tbl_stats(
-		nati_obj_ptr->sram_tbl_hdl, &nat_stats, &idx_stats);
+	stats_ret = (collect_stats) ?
+		ipa_NATI_ipv4_tbl_stats(
+			nati_obj_ptr->sram_tbl_hdl, &nat_stats, &idx_stats) :
+		-1;
 
 	currTimeAs(TimeAsNanSecs, &start);
 
@@ -2243,7 +2482,7 @@ _state_mach_tbl[NATI_STATE_LAST+1][NATI_TRIG_LAST+1] =
 {
 	{
 		SM_ROW( NATI_STATE_NULL,       NATI_TRIG_NULL,       _smUndef ),
-		SM_ROW( NATI_STATE_NULL,       NATI_TRIG_ADD_TABLE,  _smUndef ),
+		SM_ROW( NATI_STATE_NULL,       NATI_TRIG_ADD_TABLE,  _smFirstTbl ),
 		SM_ROW( NATI_STATE_NULL,       NATI_TRIG_DEL_TABLE,  _smUndef ),
 		SM_ROW( NATI_STATE_NULL,       NATI_TRIG_CLR_TABLE,  _smUndef ),
 		SM_ROW( NATI_STATE_NULL,       NATI_TRIG_WLK_TABLE,  _smUndef ),
@@ -2259,7 +2498,7 @@ _state_mach_tbl[NATI_STATE_LAST+1][NATI_TRIG_LAST+1] =
 
 	{
 		SM_ROW( NATI_STATE_DDR_ONLY,   NATI_TRIG_NULL,       _smUndef ),
-		SM_ROW( NATI_STATE_DDR_ONLY,   NATI_TRIG_ADD_TABLE,  _smAddDdrTbl),
+		SM_ROW( NATI_STATE_DDR_ONLY,   NATI_TRIG_ADD_TABLE,  _smAddDdrTbl ),
 		SM_ROW( NATI_STATE_DDR_ONLY,   NATI_TRIG_DEL_TABLE,  _smDelTbl ),
 		SM_ROW( NATI_STATE_DDR_ONLY,   NATI_TRIG_CLR_TABLE,  _smClrTbl ),
 		SM_ROW( NATI_STATE_DDR_ONLY,   NATI_TRIG_WLK_TABLE,  _smWalkTbl ),
@@ -2275,7 +2514,7 @@ _state_mach_tbl[NATI_STATE_LAST+1][NATI_TRIG_LAST+1] =
 
 	{
 		SM_ROW( NATI_STATE_SRAM_ONLY,  NATI_TRIG_NULL,       _smUndef ),
-		SM_ROW( NATI_STATE_SRAM_ONLY,  NATI_TRIG_ADD_TABLE,  _smAddSramTbl),
+		SM_ROW( NATI_STATE_SRAM_ONLY,  NATI_TRIG_ADD_TABLE,  _smAddSramTbl ),
 		SM_ROW( NATI_STATE_SRAM_ONLY,  NATI_TRIG_DEL_TABLE,  _smDelTbl ),
 		SM_ROW( NATI_STATE_SRAM_ONLY,  NATI_TRIG_CLR_TABLE,  _smClrTbl ),
 		SM_ROW( NATI_STATE_SRAM_ONLY,  NATI_TRIG_WLK_TABLE,  _smWalkTbl ),
@@ -2415,20 +2654,10 @@ int ipa_nati_statemach(
 
 	IPADBG("In\n");
 
-	if ( ! nat_mutex_init )
-	{
-		ret = mutex_init();
+	ret = take_mutex();
 
-		if ( ret != 0 )
-		{
-			goto bail;
-		}
-	}
-
-	if ( pthread_mutex_lock(&nat_mutex) )
+	if ( ret != 0 )
 	{
-		IPAERR("Unable to lock the nat mutex\n");
-		ret = -EINVAL;
 		goto bail;
 	}
 
@@ -2464,11 +2693,7 @@ int ipa_nati_statemach(
 	}
 
 unlock:
-	if ( pthread_mutex_unlock(&nat_mutex) )
-	{
-		IPAERR("Unable to unlock the nat mutex\n");
-		ret = (ret) ? ret : -EPERM;
-	}
+	ret = give_mutex();
 
 bail:
 	IPADBG("Out\n");

@@ -6632,11 +6632,11 @@ int IPACM_Lan::construct_mtu_rule(struct ipa_flt_rule *rule, ipa_ip_type iptype,
 		&flt_eq.eq_attrib, sizeof(rule->eq_attrib));
 
 	//add IHL offsets
-#ifdef FEATURE_IPA_V3
+	if(IPACM_Iface::ipacmcfg->GetIPAVer() >= IPA_HW_v3_0)
 		rule->eq_attrib.rule_eq_bitmap |= (1<<10);
-#else
+	else
 		rule->eq_attrib.rule_eq_bitmap |= (1<<4);
-#endif
+
 	rule->eq_attrib.num_ihl_offset_range_16 = 1;
 	if (iptype == IPA_IP_v4)
 		rule->eq_attrib.ihl_offset_range_16[0].offset = 0x82;

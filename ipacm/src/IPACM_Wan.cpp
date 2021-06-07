@@ -6091,7 +6091,7 @@ int IPACM_Wan::handle_down_evt_ex()
 		}
 		for (i = 0; i < num_dft_rt_v6; i++)
 		{
-			if (m_routing.DeleteRoutingHdl(dft_low_lat_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES+num_dft_rt_v6], IPA_IP_v6) == false)
+			if (m_routing.DeleteRoutingHdl(dft_low_lat_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES+i], IPA_IP_v6) == false)
 			{
 				IPACMERR("Routing rule deletion failed!\n");
 				res = IPACM_FAILURE;

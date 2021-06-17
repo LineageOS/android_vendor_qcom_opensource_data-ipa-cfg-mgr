@@ -146,7 +146,7 @@ typedef enum
 	IPA_BRIDGE_LINK_UP_EVENT,                 /* ipacm_event_data_all */
 	IPA_WAN_EMBMS_LINK_UP_EVENT,              /* ipacm_event_data_mac */
 	IPA_ADDR_ADD_EVENT,                       /* ipacm_event_data_addr */
-	IPA_ADDR_DEL_EVENT,                       /* no use */
+	IPA_ADDR_DEL_EVENT,                       /* ipacm_event_data_addr */
 	IPA_ROUTE_ADD_EVENT,                      /* ipacm_event_data_addr */
 	IPA_ROUTE_DEL_EVENT,                      /* ipacm_event_data_addr */
 	IPA_WAN_UPSTREAM_ROUTE_ADD_EVENT,         /* ipacm_event_data_fid */

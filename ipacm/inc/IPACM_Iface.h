@@ -103,7 +103,7 @@ public:
 	uint32_t dft_v6fl_rule_hdl[IPV6_DEFAULT_FILTERTING_RULES + IPV6_DEFAULT_LAN_FILTERTING_RULES];
 	/* create additional set of v6 RT-rules in Wanv6RT table*/
 	uint32_t dft_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES+2*MAX_DEFAULT_v6_ROUTE_RULES];
-
+	uint32_t dft_rt_v6_glbl_idx;
 	ipa_ioc_query_intf *iface_query;
 	ipa_ioc_query_intf_tx_props *tx_prop;
 	ipa_ioc_query_intf_rx_props *rx_prop;

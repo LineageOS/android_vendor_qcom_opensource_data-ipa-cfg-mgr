@@ -366,6 +366,8 @@ private:
 	uint8_t netdev_mac[IPA_MAC_ADDR_SIZE];
 	/* create additional set of v4 Coalesce RT-rules: tcp udp */
 	uint32_t dft_coalesce_rt_rule_hdl[2*MAX_DEFAULT_v4_ROUTE_RULES+ 2*MAX_DEFAULT_v6_ROUTE_RULES];
+	/* create additional set of v4 low_lat RT-rules: tcp udp */
+	uint32_t dft_low_lat_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES+ MAX_DEFAULT_v6_ROUTE_RULES];
 
 	static int num_ipv4_modem_pdn;
 

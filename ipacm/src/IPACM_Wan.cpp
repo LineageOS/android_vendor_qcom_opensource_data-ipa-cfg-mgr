@@ -293,6 +293,7 @@ int IPACM_Wan::handle_addr_evt(ipacm_event_data_addr *data)
 #ifdef FEATURE_IPACM_HAL
 	IPACM_OffloadManager* OffloadMng;
 #endif
+	bool sec_addr = false;
 
 	memset(&hdr, 0, sizeof(hdr));
 	if(tx_prop == NULL || rx_prop == NULL)
@@ -306,18 +307,50 @@ int IPACM_Wan::handle_addr_evt(ipacm_event_data_addr *data)
 
 	if (data->iptype == IPA_IP_v6)
 	{
-		for(num_ipv6_addr=0;num_ipv6_addr<num_dft_rt_v6;num_ipv6_addr++)
+		/* Check if Global address changed for WWAN backhaul. */
+		if ((m_is_sta_mode == Q6_WAN) && is_global_ipv6_addr(data->ipv6_addr) &&
+			(data->ipv6_addr[0] || data->ipv6_addr[1]) &&
+			(ipv6_prefix[0] || ipv6_prefix[1]) &&
+			!((ipv6_prefix[0] == data->ipv6_addr[0]) &&
+				   (ipv6_prefix[1] == data->ipv6_addr[1])))
 		{
-			if((ipv6_addr[num_ipv6_addr][0] == data->ipv6_addr[0]) &&
-			   (ipv6_addr[num_ipv6_addr][1] == data->ipv6_addr[1]) &&
-			   (ipv6_addr[num_ipv6_addr][2] == data->ipv6_addr[2]) &&
-			   (ipv6_addr[num_ipv6_addr][3] == data->ipv6_addr[3]))
+			sec_addr = true;
+		}
+
+		if (sec_addr)
+		{
+			if (sec_num_dft_rt_v6 == MAX_DEFAULT_SEC_v6_ROUTE_RULES)
 			{
-				IPACMDBG_H("find matched ipv6 address, index:%d \n", num_ipv6_addr);
+				IPACMDBG_H("Secondary v6 addresses overflow:%d \n", sec_num_dft_rt_v6);
 				return IPACM_SUCCESS;
-				break;
+			}
+			for(num_ipv6_addr=0;num_ipv6_addr<sec_num_dft_rt_v6;num_ipv6_addr++)
+			{
+				if((sec_ipv6_addr[num_ipv6_addr][0] == data->ipv6_addr[0]) &&
+				   (sec_ipv6_addr[num_ipv6_addr][1] == data->ipv6_addr[1]) &&
+				   (sec_ipv6_addr[num_ipv6_addr][2] == data->ipv6_addr[2]) &&
+				   (sec_ipv6_addr[num_ipv6_addr][3] == data->ipv6_addr[3]))
+				{
+					IPACMDBG_H("find matched ipv6 address, index:%d \n", num_ipv6_addr);
+					return IPACM_SUCCESS;
+				}
 			}
 		}
+		else
+		{
+			for(num_ipv6_addr=0;num_ipv6_addr<num_dft_rt_v6;num_ipv6_addr++)
+			{
+				if((ipv6_addr[num_ipv6_addr][0] == data->ipv6_addr[0]) &&
+				   (ipv6_addr[num_ipv6_addr][1] == data->ipv6_addr[1]) &&
+				   (ipv6_addr[num_ipv6_addr][2] == data->ipv6_addr[2]) &&
+				   (ipv6_addr[num_ipv6_addr][3] == data->ipv6_addr[3]))
+				{
+					IPACMDBG_H("find matched ipv6 address, index:%d \n", num_ipv6_addr);
+					return IPACM_SUCCESS;
+				}
+			}
+		}
+
 		rt_rule = (struct ipa_ioc_add_rt_rule *)
 			calloc(1, sizeof(struct ipa_ioc_add_rt_rule) +
 				NUM_RULES * sizeof(struct ipa_rt_rule_add));
@@ -345,10 +378,21 @@ int IPACM_Wan::handle_addr_evt(ipacm_event_data_addr *data)
 		rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[1] = 0xFFFFFFFF;
 		rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[2] = 0xFFFFFFFF;
 		rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[3] = 0xFFFFFFFF;
-		ipv6_addr[num_dft_rt_v6][0] = data->ipv6_addr[0];
-		ipv6_addr[num_dft_rt_v6][1] = data->ipv6_addr[1];
-		ipv6_addr[num_dft_rt_v6][2] = data->ipv6_addr[2];
-		ipv6_addr[num_dft_rt_v6][3] = data->ipv6_addr[3];
+		if (sec_addr)
+		{
+			sec_ipv6_addr[sec_num_dft_rt_v6][0] = data->ipv6_addr[0];
+			sec_ipv6_addr[sec_num_dft_rt_v6][1] = data->ipv6_addr[1];
+			sec_ipv6_addr[sec_num_dft_rt_v6][2] = data->ipv6_addr[2];
+			sec_ipv6_addr[sec_num_dft_rt_v6][3] = data->ipv6_addr[3];
+		}
+		else
+		{
+			ipv6_addr[num_dft_rt_v6][0] = data->ipv6_addr[0];
+			ipv6_addr[num_dft_rt_v6][1] = data->ipv6_addr[1];
+			ipv6_addr[num_dft_rt_v6][2] = data->ipv6_addr[2];
+			ipv6_addr[num_dft_rt_v6][3] = data->ipv6_addr[3];
+
+		}
 		if (IPACM_Iface::ipacmcfg->isIPAv3Supported())
 			rt_rule_entry->rule.hashable = false;
 		if(m_is_sta_mode == Q6_WAN)
@@ -379,7 +423,10 @@ int IPACM_Wan::handle_addr_evt(ipacm_event_data_addr *data)
 				res = rt_rule_entry->status;
 				goto fail;
 			}
-			dft_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES + 2*num_dft_rt_v6] = rt_rule_entry->rt_rule_hdl;
+			if (sec_addr)
+				sec_dft_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES + 2*sec_num_dft_rt_v6] = rt_rule_entry->rt_rule_hdl;
+			else
+				dft_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES + 2*num_dft_rt_v6] = rt_rule_entry->rt_rule_hdl;
 
 			/* setup same rule for v6_wan table*/
 			strlcpy(rt_rule->rt_tbl_name, IPACM_Iface::ipacmcfg->rt_tbl_wan_v6.name, sizeof(rt_rule->rt_tbl_name));
@@ -395,13 +442,24 @@ int IPACM_Wan::handle_addr_evt(ipacm_event_data_addr *data)
 				res = rt_rule_entry->status;
 				goto fail;
 		}
+		if (sec_addr)
+		{
+			sec_dft_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES + 2*sec_num_dft_rt_v6+1] = rt_rule_entry->rt_rule_hdl;
+			IPACMDBG_H("Secondary ipv6 wan iface rt-rule hdl=0x%x hdl=0x%x, entry: %d %d\n",
+					sec_dft_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES + 2*sec_num_dft_rt_v6],
+					sec_dft_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES + 2*sec_num_dft_rt_v6+1],
+					MAX_DEFAULT_v4_ROUTE_RULES + 2*sec_num_dft_rt_v6,
+					MAX_DEFAULT_v4_ROUTE_RULES + 2*sec_num_dft_rt_v6+1);
+		}
+		else
+		{
 			dft_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES + 2*num_dft_rt_v6+1] = rt_rule_entry->rt_rule_hdl;
-
 			IPACMDBG_H("ipv6 wan iface rt-rule hdl=0x%x hdl=0x%x, entry: %d %d\n",
 					dft_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES + 2*num_dft_rt_v6],
 					dft_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES + 2*num_dft_rt_v6+1],
 					MAX_DEFAULT_v4_ROUTE_RULES + 2*num_dft_rt_v6,
 					MAX_DEFAULT_v4_ROUTE_RULES + 2*num_dft_rt_v6+1);
+		}
 			/* RSC TCP rule*/
 			rt_rule_entry->rule.attrib.attrib_mask |= IPA_FLT_NEXT_HDR;
 			rt_rule_entry->rule.attrib.u.v6.next_hdr = (uint8_t)IPACM_FIREWALL_IPPROTO_TCP;
@@ -423,10 +481,20 @@ int IPACM_Wan::handle_addr_evt(ipacm_event_data_addr *data)
 				res = rt_rule_entry->status;
 				goto fail;
 		}
+		if (sec_addr)
+		{
+			sec_dft_coalesce_rt_rule_hdl[2*MAX_DEFAULT_v4_ROUTE_RULES + 2*sec_num_dft_rt_v6] = rt_rule_entry->rt_rule_hdl;
+			IPACMDBG_H("Secondary ipv6 wan iface rsc tcp rt-rule hdll=0x%x\n enable(%d), entry %d", sec_dft_coalesce_rt_rule_hdl[2*MAX_DEFAULT_v4_ROUTE_RULES + 2*sec_num_dft_rt_v6],
+				IPACM_Wan::coalesce_enable_info[ext_prop->ext[0].mux_id].coalesce_tcp_enable,
+				2*MAX_DEFAULT_v4_ROUTE_RULES + 2*sec_num_dft_rt_v6);
+		}
+		else
+		{
 			dft_coalesce_rt_rule_hdl[2*MAX_DEFAULT_v4_ROUTE_RULES + 2*num_dft_rt_v6] = rt_rule_entry->rt_rule_hdl;
 			IPACMDBG_H("ipv6 wan iface rsc tcp rt-rule hdll=0x%x\n enable(%d), entry %d", dft_coalesce_rt_rule_hdl[2*MAX_DEFAULT_v4_ROUTE_RULES + 2*num_dft_rt_v6],
 				IPACM_Wan::coalesce_enable_info[ext_prop->ext[0].mux_id].coalesce_tcp_enable,
 				2*MAX_DEFAULT_v4_ROUTE_RULES + 2*num_dft_rt_v6);
+		}
 			/* RSB UDP rule*/
 			rt_rule_entry->rule.attrib.u.v6.next_hdr = (uint8_t)IPACM_FIREWALL_IPPROTO_UDP;
 #ifdef IPA_RT_SUPPORT_COAL
@@ -446,11 +514,21 @@ int IPACM_Wan::handle_addr_evt(ipacm_event_data_addr *data)
 				IPACMERR("rsb udp rt rule adding failed. Result=%d\n", rt_rule_entry->status);
 				res = rt_rule_entry->status;
 				goto fail;
-			}
+		}
+		if (sec_addr)
+		{
+			sec_dft_coalesce_rt_rule_hdl[2*MAX_DEFAULT_v4_ROUTE_RULES + 2*sec_num_dft_rt_v6+1] = rt_rule_entry->rt_rule_hdl;
+			IPACMDBG_H("Secondary ipv6 wan iface rsb udp rt-rule hdll=0x%x\n enable(%d) entry %d", sec_dft_coalesce_rt_rule_hdl[2*MAX_DEFAULT_v4_ROUTE_RULES + 2*sec_num_dft_rt_v6+1],
+				IPACM_Wan::coalesce_enable_info[ext_prop->ext[0].mux_id].coalesce_udp_enable,
+				2*MAX_DEFAULT_v4_ROUTE_RULES + 2*num_dft_rt_v6+1);
+		}
+		else
+		{
 			dft_coalesce_rt_rule_hdl[2*MAX_DEFAULT_v4_ROUTE_RULES + 2*num_dft_rt_v6+1] = rt_rule_entry->rt_rule_hdl;
 			IPACMDBG_H("ipv6 wan iface rsb udp rt-rule hdll=0x%x\n enable(%d) entry %d", dft_coalesce_rt_rule_hdl[2*MAX_DEFAULT_v4_ROUTE_RULES + 2*num_dft_rt_v6+1],
 				IPACM_Wan::coalesce_enable_info[ext_prop->ext[0].mux_id].coalesce_udp_enable,
 				2*MAX_DEFAULT_v4_ROUTE_RULES + 2*num_dft_rt_v6+1);
+		}
 
 			/* Low latency v6 rule*/
 			fd_wwan_ioctl = open(IPA_DEVICE_NAME, O_RDWR);
@@ -481,9 +559,20 @@ int IPACM_Wan::handle_addr_evt(ipacm_event_data_addr *data)
 						res = rt_rule_entry->status;
 						goto fail;
 					}
+
+				if (sec_addr)
+				{
+					sec_dft_low_lat_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES] = rt_rule_entry->rt_rule_hdl;
+					IPACMDBG_H("secondary ipv6 wan iface low lat udp rt-rule hdll=0x%x\n entry %d", sec_dft_low_lat_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES],
+						MAX_DEFAULT_v4_ROUTE_RULES + sec_num_dft_rt_v6);
+				}
+				else
+				{
 					dft_low_lat_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES + num_dft_rt_v6] = rt_rule_entry->rt_rule_hdl;
 					IPACMDBG_H("ipv6 wan iface low lat udp rt-rule hdll=0x%x\n entry %d", dft_low_lat_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES + num_dft_rt_v6],
 						MAX_DEFAULT_v4_ROUTE_RULES + num_dft_rt_v6);
+				}
+
 			}
 		}
 		else
@@ -528,7 +617,7 @@ int IPACM_Wan::handle_addr_evt(ipacm_event_data_addr *data)
 		}
 
 		/* add default filtering rules when wan-iface get global v6-prefix */
-		if (num_dft_rt_v6 == 1)
+		if (!sec_addr && num_dft_rt_v6 == 1)
 		{
 			if(m_is_sta_mode == Q6_WAN)
 			{
@@ -619,12 +708,21 @@ int IPACM_Wan::handle_addr_evt(ipacm_event_data_addr *data)
 				}
 			}
 		}
-		/* store ipv6 prefix if the ipv6 address is not link local */
-		if(is_global_ipv6_addr(data->ipv6_addr))
+
+		if (sec_addr)
 		{
-			memcpy(ipv6_prefix, data->ipv6_addr, sizeof(ipv6_prefix));
+	    	sec_num_dft_rt_v6++;
 		}
-	    num_dft_rt_v6++;
+		else
+		{
+			/* store ipv6 prefix if the ipv6 address is not link local */
+			if (is_global_ipv6_addr(data->ipv6_addr))
+			{
+				memcpy(ipv6_prefix, data->ipv6_addr, sizeof(ipv6_prefix));
+				dft_rt_v6_glbl_idx = num_dft_rt_v6;
+			}
+			num_dft_rt_v6++;
+		}
     }
 	else
 	{
@@ -639,28 +737,19 @@ int IPACM_Wan::handle_addr_evt(ipacm_event_data_addr *data)
 			else
 			{
 				IPACMDBG_H(" device (%s) ipv4 addr is changed\n", dev_name);
-				/* Delete default Coalese v4 RT rule */
 				if (m_is_sta_mode == Q6_WAN) {
-					if (m_routing.DeleteRoutingHdl(dft_coalesce_rt_rule_hdl[0], IPA_IP_v4) == false)
-					{
-						IPACMERR("Routing old RSC TCP RT rule deletion failed!\n");
-						res = IPACM_FAILURE;
-						goto fail;
-					}
-					if (m_routing.DeleteRoutingHdl(dft_coalesce_rt_rule_hdl[1], IPA_IP_v4) == false)
-					{
-						IPACMERR("Routing old RSB UDP RT rule deletion failed!\n");
-						res = IPACM_FAILURE;
-						goto fail;
-					}
+					sec_addr = true;
 				}
-				/* Delete default v4 RT rule */
-				IPACMDBG_H("Delete default v4 routing rules\n");
-				if (m_routing.DeleteRoutingHdl(dft_rt_rule_hdl[0], IPA_IP_v4) == false)
+				else
 				{
-					IPACMERR("Routing old RT rule deletion failed!\n");
-					res = IPACM_FAILURE;
-					goto fail;
+					/* Delete default v4 RT rule */
+					IPACMDBG_H("Delete default v4 routing rules\n");
+					if (m_routing.DeleteRoutingHdl(dft_rt_rule_hdl[0], IPA_IP_v4) == false)
+					{
+						IPACMERR("Routing old RT rule deletion failed!\n");
+						res = IPACM_FAILURE;
+						goto fail;
+					}
 				}
 			}
 		}
@@ -716,9 +805,18 @@ int IPACM_Wan::handle_addr_evt(ipacm_event_data_addr *data)
 				IPACMERR("rt rule adding failed. Result=%d\n", rt_rule_entry->status);
 				res = rt_rule_entry->status;
 				goto fail;
-		}
-			dft_rt_rule_hdl[0] = rt_rule_entry->rt_rule_hdl;
-			IPACMDBG_H("ipv4 wan iface rt-rule hdll=0x%x\n", dft_rt_rule_hdl[0]);
+			}
+			if (sec_addr)
+			{
+				sec_dft_rt_rule_hdl[0] = rt_rule_entry->rt_rule_hdl;
+				IPACMDBG_H("Secondary ipv4 wan iface rt-rule hdll=0x%x\n",
+					sec_dft_rt_rule_hdl[0]);
+			}
+			else
+			{
+				dft_rt_rule_hdl[0] = rt_rule_entry->rt_rule_hdl;
+				IPACMDBG_H("ipv4 wan iface rt-rule hdll=0x%x\n", dft_rt_rule_hdl[0]);
+			}
 			/* RSC TCP rule*/
 			rt_rule_entry->rule.attrib.attrib_mask |= IPA_FLT_PROTOCOL;
 			rt_rule_entry->rule.attrib.u.v4.protocol = (uint8_t)IPACM_FIREWALL_IPPROTO_TCP;
@@ -740,10 +838,19 @@ int IPACM_Wan::handle_addr_evt(ipacm_event_data_addr *data)
 				IPACMERR("rsc tcp rt rule adding failed. Result=%d\n", rt_rule_entry->status);
 				res = rt_rule_entry->status;
 				goto fail;
-		}
-			dft_coalesce_rt_rule_hdl[0] = rt_rule_entry->rt_rule_hdl;
-			IPACMDBG_H("ipv4 wan iface rsc tcp rt-rule hdll=0x%x\n enable(%d)", dft_coalesce_rt_rule_hdl[0],
-				IPACM_Wan::coalesce_enable_info[ext_prop->ext[0].mux_id].coalesce_tcp_enable);
+			}
+			if (sec_addr)
+			{
+				sec_dft_coalesce_rt_rule_hdl[0] = rt_rule_entry->rt_rule_hdl;
+				IPACMDBG_H("Secondary ipv4 wan iface rsc tcp rt-rule hdll=0x%x\n enable(%d)", sec_dft_coalesce_rt_rule_hdl[0],
+					IPACM_Wan::coalesce_enable_info[ext_prop->ext[0].mux_id].coalesce_tcp_enable);
+			}
+			else
+			{
+				dft_coalesce_rt_rule_hdl[0] = rt_rule_entry->rt_rule_hdl;
+				IPACMDBG_H("ipv4 wan iface rsc tcp rt-rule hdll=0x%x\n enable(%d)", dft_coalesce_rt_rule_hdl[0],
+					IPACM_Wan::coalesce_enable_info[ext_prop->ext[0].mux_id].coalesce_tcp_enable);
+			}
 
 			/* RSB UDP rule*/
 			rt_rule_entry->rule.attrib.u.v4.protocol = (uint8_t)IPACM_FIREWALL_IPPROTO_UDP;
@@ -765,9 +872,18 @@ int IPACM_Wan::handle_addr_evt(ipacm_event_data_addr *data)
 				res = rt_rule_entry->status;
 				goto fail;
 			}
-			dft_coalesce_rt_rule_hdl[1] = rt_rule_entry->rt_rule_hdl;
-			IPACMDBG_H("ipv4 wan iface rsb udp rt-rule hdll=0x%x\n enable(%d)", dft_coalesce_rt_rule_hdl[1],
-				IPACM_Wan::coalesce_enable_info[ext_prop->ext[0].mux_id].coalesce_udp_enable);
+			if (sec_addr)
+			{
+				sec_dft_coalesce_rt_rule_hdl[1] = rt_rule_entry->rt_rule_hdl;
+				IPACMDBG_H("Secondary ipv4 wan iface rsb udp rt-rule hdll=0x%x\n enable(%d)", sec_dft_coalesce_rt_rule_hdl[1],
+					IPACM_Wan::coalesce_enable_info[ext_prop->ext[0].mux_id].coalesce_udp_enable);
+			}
+			else
+			{
+				dft_coalesce_rt_rule_hdl[1] = rt_rule_entry->rt_rule_hdl;
+				IPACMDBG_H("ipv4 wan iface rsb udp rt-rule hdll=0x%x\n enable(%d)", dft_coalesce_rt_rule_hdl[1],
+					IPACM_Wan::coalesce_enable_info[ext_prop->ext[0].mux_id].coalesce_udp_enable);
+			}
 
 			/* low latency v4 rule*/
 			fd_wwan_ioctl = open(IPA_DEVICE_NAME, O_RDWR);
@@ -798,8 +914,16 @@ int IPACM_Wan::handle_addr_evt(ipacm_event_data_addr *data)
 					res = rt_rule_entry->status;
 					goto fail;
 				}
+			if (sec_addr)
+			{
+				sec_dft_low_lat_rt_rule_hdl[0] = rt_rule_entry->rt_rule_hdl;
+				IPACMDBG_H("secondary ipv4 low lat udp rt-rule hdll=0x%x\n", sec_dft_low_lat_rt_rule_hdl[0]);
+			}
+			else
+			{
 				dft_low_lat_rt_rule_hdl[0] = rt_rule_entry->rt_rule_hdl;
 				IPACMDBG_H("ipv4 low lat udp rt-rule hdll=0x%x\n", dft_low_lat_rt_rule_hdl[0]);
+			}
 			}
 		}
 		else
@@ -845,13 +969,21 @@ int IPACM_Wan::handle_addr_evt(ipacm_event_data_addr *data)
 			}
 		}
 
-		wan_v4_addr = data->ipv4_addr;
-		wan_v4_addr_set = true;
+			if (m_is_sta_mode == Q6_WAN && sec_addr)
+			{
+				sec_wan_v4_addr = data->ipv4_addr;
+				sec_wan_v4_addr_set = true;
+			}
+			else
+			{
+				wan_v4_addr = data->ipv4_addr;
+				wan_v4_addr_set = true;
+			}
 
-		if (m_is_sta_mode == Q6_WAN)
+			if (m_is_sta_mode == Q6_WAN && !sec_addr)
 			curr_wan_ip = data->ipv4_addr;
 
-		IPACMDBG_H("Receved wan ipv4-addr:0x%x\n",wan_v4_addr);
+			IPACMDBG_H("Receved wan ipv4-addr:0x%x, sec_addr:%d\n",data->ipv4_addr, sec_addr);
 	}
 
 #ifdef FEATURE_IPACM_HAL
@@ -873,6 +1005,280 @@ fail:
 	}
 	return res;
 }
+
+	/* handle del_address event */
+	int IPACM_Wan::handle_addr_del_evt(ipacm_event_data_addr *data)
+	{
+		bool result;
+
+		const int NUM_RULES = 1;
+		uint32_t num_ipv6_addr, rt_idx = 0;
+		int res = IPACM_SUCCESS,len;
+#ifdef FEATURE_IPACM_HAL
+		IPACM_OffloadManager* OffloadMng;
+#endif
+		bool sec_addr = false, pri_addr = false;
+		int i = 0;
+		bool wan_active = false;
+
+		if(tx_prop == NULL || rx_prop == NULL)
+		{
+			IPACMDBG_H("Either tx or rx property is NULL, return.\n");
+			return IPACM_SUCCESS;
+		}
+
+		if (data->iptype == IPA_IP_v6)
+		{
+			/* Check if the address deleted is primary or secondary address. */
+
+			for(num_ipv6_addr=0;num_ipv6_addr<sec_num_dft_rt_v6;num_ipv6_addr++)
+			{
+				if((sec_ipv6_addr[num_ipv6_addr][0] == data->ipv6_addr[0]) &&
+					(sec_ipv6_addr[num_ipv6_addr][1] == data->ipv6_addr[1]) &&
+					(sec_ipv6_addr[num_ipv6_addr][2] == data->ipv6_addr[2]) &&
+					(sec_ipv6_addr[num_ipv6_addr][3] == data->ipv6_addr[3]))
+				{
+						IPACMDBG_H("find matched ipv6 address, index:%d \n", num_ipv6_addr);
+						sec_addr = true;
+				}
+			}
+
+			for(num_ipv6_addr=0;num_ipv6_addr<num_dft_rt_v6;num_ipv6_addr++)
+			{
+				if((ipv6_addr[num_ipv6_addr][0] == data->ipv6_addr[0]) &&
+					(ipv6_addr[num_ipv6_addr][1] == data->ipv6_addr[1]) &&
+					(ipv6_addr[num_ipv6_addr][2] == data->ipv6_addr[2]) &&
+					(ipv6_addr[num_ipv6_addr][3] == data->ipv6_addr[3]))
+				{
+					IPACMDBG_H("find matched ipv6 address, index:%d \n", num_ipv6_addr);
+					pri_addr = true;
+					rt_idx = num_ipv6_addr;
+				}
+			}
+
+			if (!sec_addr && !pri_addr)
+			{
+				IPACMDBG_H("Not matching Either Primary or Secondary addresses, return.\n");
+				return IPACM_SUCCESS;
+			}
+
+			if (sec_addr)
+			{
+				/* Clean up the rules. */
+				IPACMDBG_H("Delete Secondary v6 routing rules\n");
+				for (i = 0; i < 2; i++)
+				{
+					/* delete v6 colasce rules */
+					if (m_routing.DeleteRoutingHdl(sec_dft_coalesce_rt_rule_hdl[2*MAX_DEFAULT_v4_ROUTE_RULES+i], IPA_IP_v6) == false)
+					{
+						IPACMERR("Colasce Routing rule deletion failed!\n");
+						res = IPACM_FAILURE;
+						goto fail;
+					}
+					if (m_routing.DeleteRoutingHdl(sec_dft_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES + i], IPA_IP_v6) == false)
+					{
+						IPACMERR("Routing rule deletion failed!\n");
+						res = IPACM_FAILURE;
+						goto fail;
+					}
+				}
+				if (m_routing.DeleteRoutingHdl(sec_dft_low_lat_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES], IPA_IP_v6) == false)
+				{
+					IPACMERR("Routing rule deletion failed!\n");
+					res = IPACM_FAILURE;
+					goto fail;
+				}
+				memset(sec_ipv6_addr, 0, sizeof(sec_ipv6_addr));
+				sec_num_dft_rt_v6 = 0;
+				return IPACM_SUCCESS;
+			}
+
+			if (pri_addr)
+			{
+				/* delete v6 colasce rules and copy secondary rules into Primary if applicable. */
+				IPACMDBG_H("Delete Primary v6 routing rules\n");
+				for (i = 0; i < MAX_DEFAULT_v6_ROUTE_RULES; i++)
+				{
+					if (m_routing.DeleteRoutingHdl(dft_coalesce_rt_rule_hdl[2*MAX_DEFAULT_v4_ROUTE_RULES + 2*rt_idx+i], IPA_IP_v6) == false)
+					{
+						IPACMERR("Colasce Routing rule deletion failed!\n");
+						res = IPACM_FAILURE;
+						goto fail;
+					}
+					if (is_global_ipv6_addr(data->ipv6_addr) && sec_num_dft_rt_v6 > 0)
+					{
+						dft_coalesce_rt_rule_hdl[2*MAX_DEFAULT_v4_ROUTE_RULES + 2*rt_idx+i] =
+							sec_dft_coalesce_rt_rule_hdl[2*MAX_DEFAULT_v4_ROUTE_RULES+i];
+						sec_dft_coalesce_rt_rule_hdl[2*MAX_DEFAULT_v4_ROUTE_RULES+i] = 0;
+						IPACMDBG_H("Coalescing routing rule update, index: %d/%d, hdl:%d\n",
+							rt_idx, 2*rt_idx+i,
+							dft_coalesce_rt_rule_hdl[2*MAX_DEFAULT_v4_ROUTE_RULES + 2*rt_idx+i]);
+					}
+					if (m_routing.DeleteRoutingHdl(dft_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES+2*rt_idx+i], IPA_IP_v6) == false)
+					{
+						IPACMERR("Routing rule deletion failed!\n");
+						res = IPACM_FAILURE;
+						goto fail;
+					}
+					if (is_global_ipv6_addr(data->ipv6_addr) && sec_num_dft_rt_v6 > 0)
+					{
+						dft_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES+2*rt_idx+i] =
+							sec_dft_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES + i];
+						sec_dft_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES + i] = 0;
+						IPACMDBG_H("Default routing rule update, index: %d/%d, hdl:%d\n",
+							rt_idx, 2*rt_idx+i,
+							dft_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES+2*rt_idx+i]);
+					}
+				}
+
+				/* Delete low lat rules. */
+				if (m_routing.DeleteRoutingHdl(dft_low_lat_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES+rt_idx], IPA_IP_v6) == false)
+				{
+					IPACMERR("Routing rule deletion failed!\n");
+					res = IPACM_FAILURE;
+					goto fail;
+				}
+				/* Copy secondary rules into Primary. */
+				if (is_global_ipv6_addr(data->ipv6_addr) && sec_num_dft_rt_v6 > 0)
+				{
+					dft_low_lat_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES+rt_idx] =
+						sec_dft_low_lat_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES];
+				}
+
+				if (is_global_ipv6_addr(data->ipv6_addr) && sec_num_dft_rt_v6 > 0)
+				{
+					if (active_v6)
+					{
+						post_wan_down_tether_evt(IPA_IP_v6, 0);
+						del_wan_firewall_rule(IPA_IP_v6);
+						handle_route_del_evt_ex(IPA_IP_v6);
+						wan_active = true;
+					}
+					/* Copy Secondary Address onto Primary. */
+					ipv6_addr[rt_idx][0] = sec_ipv6_addr[sec_num_dft_rt_v6-1][0];
+					ipv6_addr[rt_idx][1] = sec_ipv6_addr[sec_num_dft_rt_v6-1][1];
+					ipv6_addr[rt_idx][2] = sec_ipv6_addr[sec_num_dft_rt_v6-1][2];
+					ipv6_addr[rt_idx][3] = sec_ipv6_addr[sec_num_dft_rt_v6-1][3];
+					memcpy(ipv6_prefix, sec_ipv6_addr[sec_num_dft_rt_v6-1], sizeof(ipv6_prefix));
+					memset(sec_ipv6_addr[sec_num_dft_rt_v6-1], 0, sizeof(sec_ipv6_addr[sec_num_dft_rt_v6-1]));
+					sec_num_dft_rt_v6--;
+					IPACMDBG_H("Secondary v6 num %d: \n",sec_num_dft_rt_v6);
+					if (wan_active)
+					{
+						handle_route_add_evt(IPA_IP_v6);
+					}
+				}
+				else
+				{
+					num_dft_rt_v6--;
+					IPACMDBG_H("v6 num %d: \n",num_dft_rt_v6);
+				}
+			}
+		}
+		else
+		{
+			if (data->ipv4_addr == sec_wan_v4_addr)
+			{
+				IPACMDBG_H("Delete Secondary coalescing v4 routing rules\n");
+				if (m_routing.DeleteRoutingHdl(sec_dft_coalesce_rt_rule_hdl[0], IPA_IP_v4) == false)
+				{
+					IPACMERR("Routing old RSC TCP RT rule deletion failed!\n");
+					res = IPACM_FAILURE;
+					goto fail;
+				}
+				sec_dft_coalesce_rt_rule_hdl[0] = 0;
+				if (m_routing.DeleteRoutingHdl(sec_dft_coalesce_rt_rule_hdl[1], IPA_IP_v4) == false)
+				{
+					IPACMERR("Routing old RSB UDP RT rule deletion failed!\n");
+					res = IPACM_FAILURE;
+					goto fail;
+				}
+				sec_dft_coalesce_rt_rule_hdl[1] = 0;
+				IPACMDBG_H("Delete Secondary v4 default routing rules\n");
+				if (m_routing.DeleteRoutingHdl(sec_dft_rt_rule_hdl[0], IPA_IP_v4) == false)
+				{
+					IPACMERR("Routing old RT rule deletion failed!\n");
+					res = IPACM_FAILURE;
+					goto fail;
+				}
+				sec_dft_rt_rule_hdl[0] = 0;
+				if (m_routing.DeleteRoutingHdl(sec_dft_low_lat_rt_rule_hdl[0], IPA_IP_v4) == false)
+				{
+					IPACMERR("Secondary Routing rule low lat deletion failed!\n");
+					res = IPACM_FAILURE;
+					goto fail;
+				}
+				sec_dft_low_lat_rt_rule_hdl[0] = 0;
+				sec_wan_v4_addr_set = false;
+				sec_wan_v4_addr = 0;
+				return IPACM_SUCCESS;
+			}
+			else if (data->ipv4_addr == wan_v4_addr)
+			{
+
+				IPACMDBG_H("Delete default coalescing v4 routing rules\n");
+				if (m_routing.DeleteRoutingHdl(dft_coalesce_rt_rule_hdl[0], IPA_IP_v4) == false)
+				{
+					IPACMERR("Routing old RSC TCP RT rule deletion failed!\n");
+					res = IPACM_FAILURE;
+					goto fail;
+				}
+				dft_coalesce_rt_rule_hdl[0] = sec_dft_coalesce_rt_rule_hdl[0];
+				sec_dft_coalesce_rt_rule_hdl[0] = 0;
+				if (m_routing.DeleteRoutingHdl(dft_coalesce_rt_rule_hdl[1], IPA_IP_v4) == false)
+				{
+					IPACMERR("Routing old RSB UDP RT rule deletion failed!\n");
+					res = IPACM_FAILURE;
+					goto fail;
+				}
+				dft_coalesce_rt_rule_hdl[1] = sec_dft_coalesce_rt_rule_hdl[1];
+				sec_dft_coalesce_rt_rule_hdl[1] = 0;
+				IPACMDBG_H("New coalescing routing rule hdls:%d:%d\n",
+					dft_coalesce_rt_rule_hdl[0],dft_coalesce_rt_rule_hdl[1]);
+				IPACMDBG_H("Delete default v4 routing rules\n");
+				if (m_routing.DeleteRoutingHdl(dft_rt_rule_hdl[0], IPA_IP_v4) == false)
+				{
+					IPACMERR("Routing old RT rule deletion failed!\n");
+					res = IPACM_FAILURE;
+					goto fail;
+				}
+				dft_rt_rule_hdl[0] = sec_dft_rt_rule_hdl[0];
+				IPACMDBG_H("New default rule routing rule hdl:%d\n",
+					dft_rt_rule_hdl[0]);
+				if (m_routing.DeleteRoutingHdl(dft_low_lat_rt_rule_hdl[0], IPA_IP_v4) == false)
+				{
+					IPACMERR("Routing old RT rule deletion failed!\n");
+					res = IPACM_FAILURE;
+					goto fail;
+				}
+				dft_low_lat_rt_rule_hdl[0] = sec_dft_low_lat_rt_rule_hdl[0];
+				IPACMDBG_H("New default rule low lat routing rule hdl:%d\n",
+					sec_dft_low_lat_rt_rule_hdl[0]);
+
+				/* Post WAN_DOWN with old ip address. */
+				if (active_v4)
+				{
+					post_wan_down_tether_evt(IPA_IP_v4, 0);
+					del_wan_firewall_rule(IPA_IP_v4);
+					handle_route_del_evt_ex(IPA_IP_v4);
+					wan_active = true;
+				}
+				wan_v4_addr = sec_wan_v4_addr;
+				IPACMDBG_H("WAN IPv4 address:0x%x\n",
+					wan_v4_addr);
+				sec_wan_v4_addr_set = false;
+				sec_wan_v4_addr = 0;
+				/* Post WAN_UP with new ip address. */
+				if (wan_active)
+				{
+					handle_route_add_evt(IPA_IP_v4);
+				}
+			}
+		}
+fail:
+		return res;
+	}
+
 
 /* handle new_address event */
 int IPACM_Wan::handle_addr_evt_mhi_q6(ipacm_event_data_addr *data)
@@ -1305,9 +1711,11 @@ void IPACM_Wan::event_callback(ipa_cm_event_id event, void *param)
 			if (ipa_interface_index == ipa_if_num)
 			{
 				IPACMDBG_H("Get IPA_ADDR_ADD_EVENT: IF ip type %d, incoming ip type %d\n", ip_type, data->iptype);
-				/* check v4 not setup before, v6 can have 2 iface ip */
+					/* check v4 not setup before, v6 can have 2 iface ip or secondary ipv6 address. */
 				if( (data->iptype == IPA_IP_v4)
-				    || ((data->iptype==IPA_IP_v6) && (num_dft_rt_v6!=MAX_DEFAULT_v6_ROUTE_RULES)))
+					    || ((data->iptype==IPA_IP_v6) && (num_dft_rt_v6!=MAX_DEFAULT_v6_ROUTE_RULES))
+					    || ((data->iptype==IPA_IP_v6) && is_global_ipv6_addr(data->ipv6_addr)
+					    && (m_is_sta_mode == Q6_WAN) && sec_num_dft_rt_v6 != MAX_DEFAULT_SEC_v6_ROUTE_RULES) )
 				{
 					if (m_is_sta_mode == Q6_MHI_WAN)
 					{
@@ -1335,8 +1743,30 @@ void IPACM_Wan::event_callback(ipa_cm_event_id event, void *param)
 							handle_software_routing_enable(false);
 						}
 					}
-
+					}
 				}
+			}
+			break;
+
+		case IPA_ADDR_DEL_EVENT:
+			{
+				ipacm_event_data_addr *data = (ipacm_event_data_addr *)param;
+				ipa_interface_index = iface_ipa_index_query(data->if_index);
+
+				if ( (data->iptype == IPA_IP_v4 && data->ipv4_addr == 0) ||
+						 (data->iptype == IPA_IP_v6 &&
+							data->ipv6_addr[0] == 0 && data->ipv6_addr[1] == 0 &&
+						  data->ipv6_addr[2] == 0 && data->ipv6_addr[3] == 0) )
+				{
+					IPACMDBG_H("Invalid address, ignore IPA_ADDR_DEL_EVENT event\n");
+					return;
+				}
+
+				if (ipa_interface_index == ipa_if_num)
+				{
+					IPACMDBG_H("Get IPA_ADDR_DEL_EVENT: IF ip type %d, incoming ip type %d\n", ip_type, data->iptype);
+					IPACMDBG_H("v6 num %d: \n",num_dft_rt_v6);
+					handle_addr_del_evt(data);
 			}
 		}
 		break;
@@ -5891,6 +6321,41 @@ int IPACM_Wan::handle_down_evt_ex()
 			res = IPACM_FAILURE;
 			goto fail;
 		}
+
+		if (sec_wan_v4_addr_set)
+		{
+			IPACMDBG_H("Delete Secondary v4 coalesce routing rules\n");
+			if (m_routing.DeleteRoutingHdl(sec_dft_coalesce_rt_rule_hdl[0], IPA_IP_v4) == false)
+			{
+				IPACMERR("Secondary Routing rule RSC TCP deletion failed!\n");
+				res = IPACM_FAILURE;
+				goto fail;
+			}
+
+			if (m_routing.DeleteRoutingHdl(sec_dft_coalesce_rt_rule_hdl[1], IPA_IP_v4) == false)
+			{
+				IPACMERR("Secondary Routing rule RSB UDP deletion failed!\n");
+				res = IPACM_FAILURE;
+				goto fail;
+			}
+
+			if (m_routing.DeleteRoutingHdl(sec_dft_rt_rule_hdl[0], IPA_IP_v4) == false)
+			{
+				IPACMERR("Secondary Routing rule deletion failed!\n");
+				res = IPACM_FAILURE;
+				goto fail;
+			}
+
+			if (m_routing.DeleteRoutingHdl(sec_dft_low_lat_rt_rule_hdl[0], IPA_IP_v4) == false)
+			{
+				IPACMERR("Secondary Routing rule low lat deletion failed!\n");
+				res = IPACM_FAILURE;
+				goto fail;
+			}
+
+			sec_wan_v4_addr_set = false;
+			sec_wan_v4_addr = 0;
+		}
 	}
 	else if(ip_type == IPA_IP_v6)
 	{
@@ -5957,6 +6422,7 @@ int IPACM_Wan::handle_down_evt_ex()
 				goto fail;
 			}
 		}
+
 		/* Delete v6 low lat rules */
 		for (i = 0; i < num_dft_rt_v6; i++)
 		{
@@ -5966,6 +6432,36 @@ int IPACM_Wan::handle_down_evt_ex()
 				res = IPACM_FAILURE;
 				goto fail;
 			}
+		}
+
+		if (sec_num_dft_rt_v6)
+		{
+			/* Clean up the rules. */
+			IPACMDBG_H("Delete Secondary v6 routing rules\n");
+			for (i = 0; i < 2; i++)
+			{
+				/* delete v6 colasce rules */
+				if (m_routing.DeleteRoutingHdl(sec_dft_coalesce_rt_rule_hdl[2*MAX_DEFAULT_v4_ROUTE_RULES+i], IPA_IP_v6) == false)
+				{
+					IPACMERR("Colasce Routing rule deletion failed!\n");
+					res = IPACM_FAILURE;
+					goto fail;
+				}
+				if (m_routing.DeleteRoutingHdl(sec_dft_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES + i], IPA_IP_v6) == false)
+				{
+					IPACMERR("Routing rule deletion failed!\n");
+					res = IPACM_FAILURE;
+					goto fail;
+				}
+			}
+			if (m_routing.DeleteRoutingHdl(sec_dft_low_lat_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES], IPA_IP_v6) == false)
+			{
+				IPACMERR("Routing rule deletion failed!\n");
+				res = IPACM_FAILURE;
+				goto fail;
+			}
+			memset(sec_ipv6_addr, 0, sizeof(sec_ipv6_addr));
+			sec_num_dft_rt_v6 = 0;
 		}
 	}
 	else
@@ -6073,6 +6569,41 @@ int IPACM_Wan::handle_down_evt_ex()
 			goto fail;
 		}
 
+		if (sec_wan_v4_addr_set)
+		{
+			IPACMDBG_H("Delete Secondary v4 coalesce routing rules\n");
+			if (m_routing.DeleteRoutingHdl(sec_dft_coalesce_rt_rule_hdl[0], IPA_IP_v4) == false)
+			{
+				IPACMERR("Secondary Routing rule RSC TCP deletion failed!\n");
+				res = IPACM_FAILURE;
+				goto fail;
+			}
+
+			if (m_routing.DeleteRoutingHdl(sec_dft_coalesce_rt_rule_hdl[1], IPA_IP_v4) == false)
+			{
+				IPACMERR("Secondary Routing rule RSB UDP deletion failed!\n");
+				res = IPACM_FAILURE;
+				goto fail;
+			}
+
+			if (m_routing.DeleteRoutingHdl(sec_dft_rt_rule_hdl[0], IPA_IP_v4) == false)
+			{
+				IPACMERR("Secondary Routing rule deletion failed!\n");
+				res = IPACM_FAILURE;
+				goto fail;
+			}
+
+			if (m_routing.DeleteRoutingHdl(sec_dft_low_lat_rt_rule_hdl[0], IPA_IP_v4) == false)
+			{
+				IPACMERR("Routing rule deletion failed!\n");
+				res = IPACM_FAILURE;
+				goto fail;
+			}
+
+			sec_wan_v4_addr_set = false;
+			sec_wan_v4_addr = 0;
+		}
+
 		for (i = 0; i < 2*num_dft_rt_v6; i++)
 		{
 			/* delete v6 colasce rules */
@@ -6089,6 +6620,7 @@ int IPACM_Wan::handle_down_evt_ex()
 				goto fail;
 			}
 		}
+
 		for (i = 0; i < num_dft_rt_v6; i++)
 		{
 			if (m_routing.DeleteRoutingHdl(dft_low_lat_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES+i], IPA_IP_v6) == false)
@@ -6097,6 +6629,36 @@ int IPACM_Wan::handle_down_evt_ex()
 				res = IPACM_FAILURE;
 				goto fail;
 			}
+		}
+
+		if (sec_num_dft_rt_v6)
+		{
+			/* Clean up the rules. */
+			IPACMDBG_H("Delete Secondary v6 routing rules\n");
+			for (i = 0; i < 2; i++)
+			{
+				/* delete v6 colasce rules */
+				if (m_routing.DeleteRoutingHdl(sec_dft_coalesce_rt_rule_hdl[2*MAX_DEFAULT_v4_ROUTE_RULES+i], IPA_IP_v6) == false)
+				{
+					IPACMERR("Colasce Routing rule deletion failed!\n");
+					res = IPACM_FAILURE;
+					goto fail;
+				}
+				if (m_routing.DeleteRoutingHdl(sec_dft_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES + i], IPA_IP_v6) == false)
+				{
+					IPACMERR("Routing rule deletion failed!\n");
+					res = IPACM_FAILURE;
+					goto fail;
+				}
+			}
+			if (m_routing.DeleteRoutingHdl(sec_dft_low_lat_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES], IPA_IP_v6) == false)
+			{
+				IPACMERR("Routing rule deletion failed!\n");
+				res = IPACM_FAILURE;
+				goto fail;
+			}
+			memset(sec_ipv6_addr, 0, sizeof(sec_ipv6_addr));
+			sec_num_dft_rt_v6 = 0;
 		}
 	}
 
@@ -7642,6 +8204,136 @@ int IPACM_Wan::handle_coalesce_evt()
 fail:
 	free(rt_rule);
 	}
+
+	if(sec_wan_v4_addr_set)
+	{
+		/* Delete secondary default RSC v4 RT rule */
+		if (m_routing.DeleteRoutingHdl(sec_dft_coalesce_rt_rule_hdl[0], IPA_IP_v4) == false)
+		{
+			IPACMERR("Sec Routing old RSC TCP RT rule deletion failed!\n");
+			return	IPACM_FAILURE;
+		}
+		if (m_routing.DeleteRoutingHdl(sec_dft_coalesce_rt_rule_hdl[1], IPA_IP_v4) == false)
+		{
+			IPACMERR("Sec Routing old RSB UDP RT rule deletion failed!\n");
+			return	IPACM_FAILURE;
+		}
+		/* Delete secondary default v4 RT rule */
+		IPACMDBG_H("Delete Secondary default v4 routing rules\n");
+		if (m_routing.DeleteRoutingHdl(sec_dft_rt_rule_hdl[0], IPA_IP_v4) == false)
+		{
+			IPACMERR("Routing old RT rule deletion failed!\n");
+			return	IPACM_FAILURE;
+		}
+
+		/* apply the new coalesce configuration for secondary address. */
+		rt_rule = (struct ipa_ioc_add_rt_rule *)
+			 calloc(1, sizeof(struct ipa_ioc_add_rt_rule) +
+							NUM_RULES * sizeof(struct ipa_rt_rule_add));
+		if (!rt_rule)
+		{
+			IPACMERR("Error Locate ipa_ioc_add_rt_rule memory...\n");
+			return IPACM_FAILURE;
+		}
+		rt_rule->commit = 1;
+		rt_rule->num_rules = NUM_RULES;
+		rt_rule->ip = IPA_IP_v4;
+		rt_rule_entry = &rt_rule->rules[0];
+		rt_rule_entry->at_rear = true;
+		rt_rule_entry->rule.attrib.attrib_mask = IPA_FLT_DST_ADDR;
+		/* still need setup v4 default routing rule to APPs*/
+		strlcpy(rt_rule->rt_tbl_name, IPACM_Iface::ipacmcfg->rt_tbl_lan_v4.name, sizeof(rt_rule->rt_tbl_name));
+		rt_rule_entry->rule.attrib.u.v4.dst_addr = sec_wan_v4_addr;
+		rt_rule_entry->rule.attrib.u.v4.dst_addr_mask = 0xFFFFFFFF;
+		if (IPACM_Iface::ipacmcfg->isIPAv3Supported())
+			rt_rule_entry->rule.hashable = false;
+		/* query qmap header*/
+		memset(&hdr, 0, sizeof(hdr));
+		strlcpy(hdr.name, tx_prop->tx[0].hdr_name, sizeof(hdr.name));
+		hdr.name[IPA_RESOURCE_NAME_MAX-1] = '\0';
+		if(m_header.GetHeaderHandle(&hdr) == false)
+		{
+			IPACMERR("Failed to get QMAP header.\n");
+			res = IPACM_FAILURE;
+			goto fail1;
+		}
+		rt_rule_entry->rule.hdr_hdl = hdr.hdl;
+		rt_rule_entry->rule.dst = IPA_CLIENT_APPS_WAN_CONS;
+
+		/* RSB UDP rule*/
+		rt_rule_entry->rule.attrib.attrib_mask |= IPA_FLT_PROTOCOL;
+		rt_rule_entry->rule.attrib.u.v4.protocol = (uint8_t)IPACM_FIREWALL_IPPROTO_UDP;
+#ifdef IPA_RT_SUPPORT_COAL
+		if (IPACM_Wan::coalesce_enable_info[ext_prop->ext[0].mux_id].coalesce_tcp_enable)
+			rt_rule_entry->rule.coalesce = true;
+		else
+			rt_rule_entry->rule.coalesce = false;
+#endif
+		if (false == m_routing.AddRoutingRule(rt_rule))
+		{
+			IPACMERR("Routing rule addition failed!\n");
+			res = IPACM_FAILURE;
+			goto fail1;
+		}
+		else if (rt_rule_entry->status)
+		{
+			IPACMERR("secondary rsb udp rt rule adding failed. Result=%d\n", rt_rule_entry->status);
+			res = rt_rule_entry->status;
+			goto fail1;
+		}
+		sec_dft_coalesce_rt_rule_hdl[1] = rt_rule_entry->rt_rule_hdl;
+		IPACMDBG_H("secondary ipv4 wan iface rsb udp rt-rule hdll=0x%x enable(%d)\n", sec_dft_coalesce_rt_rule_hdl[1],
+			IPACM_Wan::coalesce_enable_info[ext_prop->ext[0].mux_id].coalesce_udp_enable);
+
+		/* RSC TCP rule*/
+		rt_rule_entry->rule.attrib.u.v4.protocol = (uint8_t)IPACM_FIREWALL_IPPROTO_TCP;
+#ifdef IPA_RT_SUPPORT_COAL
+		if (IPACM_Wan::coalesce_enable_info[ext_prop->ext[0].mux_id].coalesce_tcp_enable)
+			rt_rule_entry->rule.coalesce = true;
+		else
+			rt_rule_entry->rule.coalesce = false;
+#endif
+		if (false == m_routing.AddRoutingRule(rt_rule))
+		{
+			IPACMERR("Routing rule addition failed!\n");
+			res = IPACM_FAILURE;
+			goto fail1;
+		}
+		else if (rt_rule_entry->status)
+		{
+			IPACMERR("secondary rsc tcp rt rule adding failed. Result=%d\n", rt_rule_entry->status);
+			res = rt_rule_entry->status;
+			goto fail1;
+		}
+		sec_dft_coalesce_rt_rule_hdl[0] = rt_rule_entry->rt_rule_hdl;
+		IPACMDBG_H("secondary ipv4 wan iface rsc tcp rt-rule hdll=0x%x\n enable(%d)", sec_dft_coalesce_rt_rule_hdl[0],
+			IPACM_Wan::coalesce_enable_info[ext_prop->ext[0].mux_id].coalesce_tcp_enable);
+
+		/*	secondary default v4 rt-rule */
+		rt_rule_entry->rule.attrib.attrib_mask &= ~IPA_FLT_PROTOCOL;
+#ifdef IPA_RT_SUPPORT_COAL
+			rt_rule_entry->rule.coalesce = false;
+#endif
+		/* Secondary default v4 rt-rule */
+		if (false == m_routing.AddRoutingRule(rt_rule))
+		{
+			IPACMERR("Routing rule addition failed!\n");
+			res = IPACM_FAILURE;
+			goto fail1;
+		}
+		else if (rt_rule_entry->status)
+		{
+			IPACMERR("secondary rt rule adding failed. Result=%d\n", rt_rule_entry->status);
+			res = rt_rule_entry->status;
+			goto fail1;
+		}
+		sec_dft_rt_rule_hdl[0] = rt_rule_entry->rt_rule_hdl;
+		IPACMDBG_H("secondary ipv4 wan iface rt-rule hdll=0x%x\n", sec_dft_rt_rule_hdl[0]);
+
+fail1:
+	free(rt_rule);
+	}
+
 	/* v6 */
 	if (num_dft_rt_v6 !=0)
 	{
@@ -7793,6 +8485,159 @@ fail:
 fail2:
 	free(rt_rule);
 	}
+
+	/* Secondary v6 */
+	if (sec_num_dft_rt_v6 !=0)
+	{
+		for (i = 0; i < 2*sec_num_dft_rt_v6; i++)
+		{
+			/* delete secondary v6 colasce rules */
+			if (m_routing.DeleteRoutingHdl(sec_dft_coalesce_rt_rule_hdl[2*MAX_DEFAULT_v4_ROUTE_RULES+i], IPA_IP_v6) == false)
+			{
+				IPACMERR("Colasce Routing rule deletion failed!\n");
+				return	IPACM_FAILURE;
+			}
+			/* delete secondary v6 default rules */
+			if (m_routing.DeleteRoutingHdl(sec_dft_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES+i], IPA_IP_v6) == false)
+			{
+				IPACMERR("Routing rule deletion failed!\n");
+				return	IPACM_FAILURE;
+			}
+		}
+
+		rt_rule = (struct ipa_ioc_add_rt_rule *)
+			calloc(1, sizeof(struct ipa_ioc_add_rt_rule) +
+				NUM_RULES * sizeof(struct ipa_rt_rule_add));
+		if (!rt_rule)
+		{
+			IPACMERR("Error Locate ipa_ioc_add_rt_rule memory...\n");
+			return IPACM_FAILURE;
+		}
+		rt_rule->commit = 1;
+		rt_rule->num_rules = NUM_RULES;
+		rt_rule->ip = IPA_IP_v6;
+
+		for (i = 0; i < sec_num_dft_rt_v6; i++)
+		{
+			/* setup same rule for v6_wan table */
+			strlcpy(rt_rule->rt_tbl_name, IPACM_Iface::ipacmcfg->rt_tbl_v6.name, sizeof(rt_rule->rt_tbl_name));
+			rt_rule_entry = &rt_rule->rules[0];
+			rt_rule_entry->at_rear = true;
+			rt_rule_entry->rule.attrib.attrib_mask = IPA_FLT_DST_ADDR;
+			rt_rule_entry->rule.attrib.u.v6.dst_addr[0] = sec_ipv6_addr[i][0];
+			rt_rule_entry->rule.attrib.u.v6.dst_addr[1] = sec_ipv6_addr[i][1];
+			rt_rule_entry->rule.attrib.u.v6.dst_addr[2] = sec_ipv6_addr[i][2];
+			rt_rule_entry->rule.attrib.u.v6.dst_addr[3] = sec_ipv6_addr[i][3];
+			rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[0] = 0xFFFFFFFF;
+			rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[1] = 0xFFFFFFFF;
+			rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[2] = 0xFFFFFFFF;
+			rt_rule_entry->rule.attrib.u.v6.dst_addr_mask[3] = 0xFFFFFFFF;
+			if (IPACM_Iface::ipacmcfg->isIPAv3Supported())
+				rt_rule_entry->rule.hashable = false;
+			strlcpy(hdr.name, tx_prop->tx[0].hdr_name, sizeof(hdr.name));
+			hdr.name[IPA_RESOURCE_NAME_MAX-1] = '\0';
+			if(m_header.GetHeaderHandle(&hdr) == false)
+			{
+				IPACMERR("Failed to get QMAP header.\n");
+				return IPACM_FAILURE;
+			}
+			rt_rule_entry->rule.hdr_hdl = hdr.hdl;
+			rt_rule_entry->rule.dst = IPA_CLIENT_APPS_WAN_CONS;
+
+			/* Secondary RSB UDP rule*/
+			rt_rule_entry->rule.attrib.attrib_mask |= IPA_FLT_NEXT_HDR;
+			rt_rule_entry->rule.attrib.u.v6.next_hdr = (uint8_t)IPACM_FIREWALL_IPPROTO_UDP;
+#ifdef IPA_RT_SUPPORT_COAL
+			if (IPACM_Wan::coalesce_enable_info[ext_prop->ext[0].mux_id].coalesce_udp_enable)
+				rt_rule_entry->rule.coalesce = true;
+			else
+				rt_rule_entry->rule.coalesce = false;
+#endif
+			if (false == m_routing.AddRoutingRule(rt_rule))
+			{
+				IPACMERR("Routing rule addition failed!\n");
+				res = IPACM_FAILURE;
+				goto fail3;
+			}
+			else if (rt_rule_entry->status)
+			{
+				IPACMERR("secondary rsb udp rt rule adding failed. Result=%d\n", rt_rule_entry->status);
+				res = rt_rule_entry->status;
+				goto fail3;
+			}
+			sec_dft_coalesce_rt_rule_hdl[2*MAX_DEFAULT_v4_ROUTE_RULES + 2*i+1] = rt_rule_entry->rt_rule_hdl;
+			IPACMDBG_H("secondary ipv6 wan iface rsb udp rt-rule hdll=0x%x\n enable(%d)", sec_dft_coalesce_rt_rule_hdl[2*MAX_DEFAULT_v4_ROUTE_RULES + 2*i+1],
+				IPACM_Wan::coalesce_enable_info[ext_prop->ext[0].mux_id].coalesce_udp_enable);
+
+			/* Secondary RSC TCP rule*/
+			rt_rule_entry->rule.attrib.u.v6.next_hdr = (uint8_t)IPACM_FIREWALL_IPPROTO_TCP;
+#ifdef IPA_RT_SUPPORT_COAL
+			if (IPACM_Wan::coalesce_enable_info[ext_prop->ext[0].mux_id].coalesce_tcp_enable)
+				rt_rule_entry->rule.coalesce = true;
+			else
+				rt_rule_entry->rule.coalesce = false;
+#endif
+			if (false == m_routing.AddRoutingRule(rt_rule))
+			{
+				IPACMERR("Routing rule addition failed!\n");
+				res = IPACM_FAILURE;
+				goto fail3;
+			}
+			else if (rt_rule_entry->status)
+			{
+				IPACMERR("secondary rsc tcp rt rule adding failed. Result=%d\n", rt_rule_entry->status);
+				res = rt_rule_entry->status;
+				goto fail3;
+			}
+			sec_dft_coalesce_rt_rule_hdl[2*MAX_DEFAULT_v4_ROUTE_RULES + 2*i] = rt_rule_entry->rt_rule_hdl;
+			IPACMDBG_H("secondary ipv6 wan iface rsc tcp rt-rule hdll=0x%x\n enable(%d)", sec_dft_coalesce_rt_rule_hdl[2*MAX_DEFAULT_v4_ROUTE_RULES + 2*i],
+				IPACM_Wan::coalesce_enable_info[ext_prop->ext[0].mux_id].coalesce_tcp_enable);
+
+			/* legacy default secondary v6 rt-rule */
+			rt_rule_entry->rule.attrib.attrib_mask &= ~IPA_FLT_NEXT_HDR;
+#ifdef IPA_RT_SUPPORT_COAL
+			rt_rule_entry->rule.coalesce = false;
+#endif
+			/* legacy default secondary v6 rt-rule */
+			if (false == m_routing.AddRoutingRule(rt_rule))
+			{
+				IPACMERR("Routing rule addition failed!\n");
+				res = IPACM_FAILURE;
+				goto fail3;
+			}
+			else if (rt_rule_entry->status)
+			{
+				IPACMERR("secondary rt rule adding failed. Result=%d\n", rt_rule_entry->status);
+				res = rt_rule_entry->status;
+				goto fail3;
+			}
+			sec_dft_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES + 2*i] = rt_rule_entry->rt_rule_hdl;
+
+			/* setup same rule for v6_lan table*/
+			strlcpy(rt_rule->rt_tbl_name, IPACM_Iface::ipacmcfg->rt_tbl_wan_v6.name, sizeof(rt_rule->rt_tbl_name));
+			if (false == m_routing.AddRoutingRule(rt_rule))
+			{
+				IPACMERR("Routing rule addition failed!\n");
+				res = IPACM_FAILURE;
+				goto fail3;
+			}
+			else if (rt_rule_entry->status)
+			{
+				IPACMERR("rt rule adding failed. Result=%d\n", rt_rule_entry->status);
+				res = rt_rule_entry->status;
+				goto fail3;
+			}
+			sec_dft_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES + 2*i+1] = rt_rule_entry->rt_rule_hdl;
+			IPACMDBG_H("secondary ipv6 wan iface rt-rule hdl=0x%x hdl=0x%x, entry: %d %d\n",
+				sec_dft_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES + 2*i],
+				sec_dft_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES + 2*i+1],
+				MAX_DEFAULT_v4_ROUTE_RULES + 2*i,
+				MAX_DEFAULT_v4_ROUTE_RULES + 2*i+1);
+		}
+fail3:
+	free(rt_rule);
+	}
+
 	return res;
 }
 

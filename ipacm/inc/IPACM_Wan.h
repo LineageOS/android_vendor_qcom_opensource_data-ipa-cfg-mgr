@@ -60,6 +60,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #else
 #define IPA_V2_NUM_DEFAULT_WAN_FILTER_RULE_IPV6 3
 #endif
+#define MAX_DEFAULT_SEC_v6_ROUTE_RULES  1
 
 #define NETWORK_STATS "%s %llu %llu %llu %llu"
 #define IPA_NETWORK_STATS_FILE_NAME "/data/misc/ipa/network_stats"
@@ -351,6 +352,8 @@ private:
 	uint32_t ODU_fl_hdl[IPA_NUM_DEFAULT_WAN_FILTER_RULES];
 	int num_firewall_v4,num_firewall_v6;
 	uint32_t wan_v4_addr;
+	uint32_t sec_wan_v4_addr;
+	bool sec_wan_v4_addr_set;
 	uint32_t wan_v4_addr_gw;
 	uint32_t wan_v6_addr_gw[4];
 	bool wan_v4_addr_set;
@@ -364,10 +367,18 @@ private:
 	bool header_partial_default_wan_v6;
 	uint8_t ext_router_mac_addr[IPA_MAC_ADDR_SIZE];
 	uint8_t netdev_mac[IPA_MAC_ADDR_SIZE];
+	/* IPACM interface secondary v6 ip-addresses */
+	uint32_t sec_ipv6_addr[MAX_DEFAULT_SEC_v6_ROUTE_RULES][4];
 	/* create additional set of v4 Coalesce RT-rules: tcp udp */
 	uint32_t dft_coalesce_rt_rule_hdl[2*MAX_DEFAULT_v4_ROUTE_RULES+ 2*MAX_DEFAULT_v6_ROUTE_RULES];
-	/* create additional set of v4 low_lat RT-rules: tcp udp */
+	/* create additional set of v4 Coalesce RT-rules for secondary addresses: tcp udp */
+	uint32_t sec_dft_coalesce_rt_rule_hdl[2*MAX_DEFAULT_v4_ROUTE_RULES+ 2*MAX_DEFAULT_SEC_v6_ROUTE_RULES];
+
+	/* create additional set of v4/v6 low_lat RT-rules: tcp udp */
 	uint32_t dft_low_lat_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES+ MAX_DEFAULT_v6_ROUTE_RULES];
+
+	/* create additional set of v4/v6 low_lat RT-rules for seconday addresses: */
+	uint32_t sec_dft_low_lat_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES+ MAX_DEFAULT_SEC_v6_ROUTE_RULES];
 
 	static int num_ipv4_modem_pdn;
 
@@ -416,6 +427,12 @@ private:
 	/* V6 MTU value. */
 	uint16_t mtu_v6;
 	bool mtu_v6_set;
+
+	/* IPACM number of default route rules for secondary ipv6 address*/
+	uint32_t sec_num_dft_rt_v6;
+
+	/* create additional set of v6 RT-rules for secondary addresses in Wanv6RT table*/
+	uint32_t sec_dft_rt_rule_hdl[MAX_DEFAULT_v4_ROUTE_RULES + 2*MAX_DEFAULT_SEC_v6_ROUTE_RULES];
 
 	inline ipa_wan_client* get_client_memptr(ipa_wan_client *param, int cnt)
 	{
@@ -604,6 +621,9 @@ private:
 
 	/* handle new_address event */
 	int handle_addr_evt(ipacm_event_data_addr *data);
+
+	/* handle del_address event */
+	int handle_addr_del_evt(ipacm_event_data_addr *data);
 
 	/* handle new_address event for q6_mhi */
 	int handle_addr_evt_mhi_q6(ipacm_event_data_addr *data);

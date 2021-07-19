@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2013-2020, The Linux Foundation. All rights reserved.
+Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -316,6 +316,21 @@ int NatApp::DeleteTable(uint32_t pub_ip)
 	pub_ip_addr_pre = pub_ip_addr;
 	Reset();
 	return 0;
+}
+
+int NatApp::MoveTable(bool to_ddr)
+{
+	int ret;
+
+	if (to_ddr) {
+		IPACMDBG_H("direction TO_DDR - move and lock table at DDR\n");
+		ret = ipa_nat_switch_to(IPA_NAT_MEM_IN_DDR, true);
+	} else {
+		IPACMDBG_H("direction TO_SRAM - allow table transition to SRAM\n");
+		ret = ipa_nat_switch_to(IPA_NAT_MEM_IN_DDR, false);
+	}
+
+	return ret;
 }
 
 /* Check for duplicate entries */

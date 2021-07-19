@@ -878,6 +878,71 @@ static int ipa_nl_decode_nlmsg
 			}
 			break;
 
+		case RTM_DELADDR:
+			IPACMDBG("\n GOT RTM_DELADDR event\n");
+			if(IPACM_SUCCESS != ipa_nl_decode_rtm_addr(buffer, buflen, &(msg_ptr->nl_addr_info)))
+			{
+				IPACMERR("Failed to decode rtm addr message\n");
+				return IPACM_FAILURE;
+			}
+			else
+			{
+				ret_val = ipa_get_if_name(dev_name, msg_ptr->nl_addr_info.metainfo.ifa_index);
+				if(ret_val != IPACM_SUCCESS)
+				{
+					IPACMERR("Error while getting interface name\n");
+				}
+				IPACMDBG("Interface %s \n", dev_name);
+
+				data_addr = (ipacm_event_data_addr *)malloc(sizeof(ipacm_event_data_addr));
+				if(data_addr == NULL)
+				{
+					IPACMERR("unable to allocate memory for event data_addr\n");
+					return IPACM_FAILURE;
+				}
+
+				if(AF_INET6 == msg_ptr->nl_addr_info.attr_info.prefix_addr.ss_family)
+				{
+					data_addr->iptype = IPA_IP_v6;
+					IPACM_NL_REPORT_ADDR( "IFA_ADDRESS:", msg_ptr->nl_addr_info.attr_info.prefix_addr );
+					IPACM_EVENT_COPY_ADDR_v6( data_addr->ipv6_addr, msg_ptr->nl_addr_info.attr_info.prefix_addr);
+					data_addr->ipv6_addr[0] = ntohl(data_addr->ipv6_addr[0]);
+					data_addr->ipv6_addr[1] = ntohl(data_addr->ipv6_addr[1]);
+					data_addr->ipv6_addr[2] = ntohl(data_addr->ipv6_addr[2]);
+					data_addr->ipv6_addr[3] = ntohl(data_addr->ipv6_addr[3]);
+				}
+				else
+				{
+					data_addr->iptype = IPA_IP_v4;
+					IPACM_NL_REPORT_ADDR( "IFA_ADDRESS:", msg_ptr->nl_addr_info.attr_info.prefix_addr );
+					IPACM_EVENT_COPY_ADDR_v4( data_addr->ipv4_addr, msg_ptr->nl_addr_info.attr_info.prefix_addr);
+					data_addr->ipv4_addr = ntohl(data_addr->ipv4_addr);
+
+				}
+
+				evt_data.event = IPA_ADDR_DEL_EVENT;
+				data_addr->if_index = msg_ptr->nl_addr_info.metainfo.ifa_index;
+				strlcpy(data_addr->iface_name, dev_name, sizeof(data_addr->iface_name));
+				if(AF_INET6 == msg_ptr->nl_addr_info.attr_info.prefix_addr.ss_family)
+				{
+				    IPACMDBG("Posting IPA_ADDR_DEL_EVENT with if index:%d, ipv6 addr:0x%x:%x:%x:%x\n",
+								 data_addr->if_index,
+								 data_addr->ipv6_addr[0],
+								 data_addr->ipv6_addr[1],
+								 data_addr->ipv6_addr[2],
+								 data_addr->ipv6_addr[3]);
+                }
+				else
+				{
+				IPACMDBG("Posting IPA_ADDR_DEL_EVENT with if index:%d, ipv4 addr:0x%x\n",
+								 data_addr->if_index,
+								 data_addr->ipv4_addr);
+				}
+				evt_data.evt_data = data_addr;
+				IPACM_EvtDispatcher::PostEvt(&evt_data);
+			}
+			break;
+
 		case RTM_NEWROUTE:
 
 			if(IPACM_SUCCESS != ipa_nl_decode_rtm_route(buffer, buflen, &(msg_ptr->nl_route_info)))

@@ -65,6 +65,7 @@ IPACM_ConntrackListener::IPACM_ConntrackListener()
 	 IPACM_EvtDispatcher::registr(IPA_HANDLE_LAN_UP, this);
 	 IPACM_EvtDispatcher::registr(IPA_NEIGH_CLIENT_IP_ADDR_ADD_EVENT, this);
 	 IPACM_EvtDispatcher::registr(IPA_NEIGH_CLIENT_IP_ADDR_DEL_EVENT, this);
+	 IPACM_EvtDispatcher::registr(IPA_MOVE_NAT_TBL_EVENT, this);
 
 #ifdef CT_OPT
 	 p_lan2lan = IPACM_LanToLan::getLan2LanInstance();
@@ -144,7 +145,10 @@ void IPACM_ConntrackListener::event_callback(ipa_cm_event_id evt,
 		 IPACMDBG("Received IPA_NEIGH_CLIENT_IP_ADDR_DEL_EVENT event\n");
 		 HandleNonNatIPAddr(data, false);
 		 break;
-
+	 case IPA_MOVE_NAT_TBL_EVENT:
+		 IPACMDBG_H("Received IPA_MOVE_NAT_TBL_EVENT event\n");
+		 HandleNatTableMove(data);
+		 break;
 	 default:
 			IPACMDBG("Ignore cmd %d\n", evt);
 			break;
@@ -1499,5 +1503,39 @@ void IPACM_ConntrackListener::processCacheConntrack(void)
 		}
 	}
 	IPACMDBG("Exit:\n");
+}
+
+void IPACM_ConntrackListener::HandleNatTableMove(void *in_param)
+{
+	int ret;
+	int fd_wwan_ioctl;
+	ipacm_event_move_nat *data_nat = (ipacm_event_move_nat *)in_param;
+
+	IPACMDBG_H("handling nat table move request\n");
+
+	fd_wwan_ioctl = open(WWAN_QMI_IOCTL_DEVICE_NAME, O_RDWR);
+	if(fd_wwan_ioctl < 0)
+	{
+		IPACMERR("Failed to open %s.\n", WWAN_QMI_IOCTL_DEVICE_NAME);
+		return;
+	}
+
+	if(data_nat->nat_move_direction == QMI_IPA_MOVE_NAT_TO_DDR_V01) {
+		ret = nat_inst->MoveTable(true);
+	}
+	else {
+		ret = nat_inst->MoveTable(false);
+	}
+
+	IPACMDBG_H("sending indication to Q6 about transition %s\n",
+		ret ? "failure" : "success");
+
+	ret = ioctl(fd_wwan_ioctl, WAN_IOC_NOTIFY_NAT_MOVE_RES, ret);
+	if(ret != 0)
+	{
+		IPACMERR("Failed sending NAT TABLR MOVE indication with ret %d\n ", ret);
+	}
+
+	close(fd_wwan_ioctl);
 }
 

@@ -470,6 +470,7 @@ int IPACM_IfaceManager::create_iface_instance(ipacm_ifacemgr_data *param)
 					IPACM_EvtDispatcher::registr(IPA_WAN_UPSTREAM_ROUTE_DEL_EVENT, w);
 					if(is_sta_mode == Q6_WAN)
 					{
+						IPACM_EvtDispatcher::registr(IPA_ADDR_DEL_EVENT, w);
 						IPACM_EvtDispatcher::registr(IPA_NETWORK_STATS_UPDATE_EVENT, w);
 #ifdef IPA_MTU_EVENT_MAX
 						IPACM_EvtDispatcher::registr(IPA_MTU_SET, w);

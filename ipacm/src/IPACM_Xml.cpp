@@ -73,6 +73,9 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <sys/socket.h>
 #include <netinet/in.h>
+#ifndef in_addr_t
+typedef uint32_t in_addr_t;
+#endif
 #include <arpa/inet.h>
 #ifndef in_addr_t
 typedef uint32_t in_addr_t;

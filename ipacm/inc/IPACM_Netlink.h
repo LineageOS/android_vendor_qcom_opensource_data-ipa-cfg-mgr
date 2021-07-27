@@ -52,7 +52,6 @@ extern "C"
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <linux/socket.h>
-#include <inaddr.h>
 #include <linux/version.h>
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 9, 0))
 #define sockaddr_storage __kernel_sockaddr_storage

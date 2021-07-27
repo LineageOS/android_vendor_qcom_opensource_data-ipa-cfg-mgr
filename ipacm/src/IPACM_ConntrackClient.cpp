@@ -42,6 +42,9 @@ SPDX-License-Identifier: BSD-3-Clause-Clear
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#ifndef in_addr_t
+typedef uint32_t in_addr_t;
+#endif
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/ioctl.h>

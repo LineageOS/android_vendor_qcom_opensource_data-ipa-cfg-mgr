@@ -3335,7 +3335,7 @@ fail:
 /* install UL filter rule from Q6 */
 int IPACM_Lan::handle_uplink_filter_rule(ipacm_ext_prop *prop, ipa_ip_type iptype, uint8_t xlat_mux_id)
 {
-	ipa_flt_rule_add flt_rule_entry;
+	static ipa_flt_rule_add flt_rule_entry;
 	int len = 0, cnt, ret = IPACM_SUCCESS;
 	ipa_ioc_add_flt_rule *pFilteringTable;
 	ipa_fltr_installed_notif_req_msg_v01 flt_index;

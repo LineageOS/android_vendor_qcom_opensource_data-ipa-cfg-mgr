@@ -1147,13 +1147,6 @@ fail:
 
 				if (is_global_ipv6_addr(data->ipv6_addr) && sec_num_dft_rt_v6 > 0)
 				{
-					if (active_v6)
-					{
-						post_wan_down_tether_evt(IPA_IP_v6, 0);
-						del_wan_firewall_rule(IPA_IP_v6);
-						handle_route_del_evt_ex(IPA_IP_v6);
-						wan_active = true;
-					}
 					/* Copy Secondary Address onto Primary. */
 					ipv6_addr[rt_idx][0] = sec_ipv6_addr[sec_num_dft_rt_v6-1][0];
 					ipv6_addr[rt_idx][1] = sec_ipv6_addr[sec_num_dft_rt_v6-1][1];
@@ -1163,10 +1156,6 @@ fail:
 					memset(sec_ipv6_addr[sec_num_dft_rt_v6-1], 0, sizeof(sec_ipv6_addr[sec_num_dft_rt_v6-1]));
 					sec_num_dft_rt_v6--;
 					IPACMDBG_H("Secondary v6 num %d: \n",sec_num_dft_rt_v6);
-					if (wan_active)
-					{
-						handle_route_add_evt(IPA_IP_v6);
-					}
 				}
 				else
 				{

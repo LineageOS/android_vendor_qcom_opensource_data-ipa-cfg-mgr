@@ -669,10 +669,6 @@ int IPACM_Wan::handle_addr_evt(ipacm_event_data_addr *data)
 			{
 				init_fl_rule(data->iptype);
 			}
-
-			del_wan_firewall_rule(IPA_IP_v6);
-			config_wan_firewall_rule(IPA_IP_v6);
-			install_wan_filtering_rule(false);
 		}
 
 		/* add WAN DL interface IP specific flt rule for IPv6 when backhaul is not Q6 */
@@ -763,6 +759,13 @@ int IPACM_Wan::handle_addr_evt(ipacm_event_data_addr *data)
 			}
 			num_dft_rt_v6++;
 			IPACMDBG_H_LOG("v6 num %d: \n",num_dft_rt_v6);
+		}
+
+		if (active_v6 && is_global_ipv6_addr(data->ipv6_addr))
+		{
+			del_wan_firewall_rule(IPA_IP_v6);
+			config_wan_firewall_rule(IPA_IP_v6);
+			install_wan_filtering_rule(false);
 		}
     }
 	else
@@ -1201,6 +1204,13 @@ fail:
 					num_dft_rt_v6--;
 					IPACMDBG_H_LOG("v6 num %d: \n",num_dft_rt_v6);
 				}
+			}
+
+			if (active_v6 && is_global_ipv6_addr(data->ipv6_addr))
+			{
+				del_wan_firewall_rule(IPA_IP_v6);
+				config_wan_firewall_rule(IPA_IP_v6);
+				install_wan_filtering_rule(false);
 			}
 		}
 		else
@@ -4979,6 +4989,11 @@ int IPACM_Wan::add_embed_dstn_ipv6_rules(struct ipa_flt_rule_add *rules, int rul
 
 		for (int i = 0; i < num_dft_rt_v6; i++)
 		{
+			if (!is_global_ipv6_addr(ipv6_addr[i]))
+			{
+				continue;
+			}
+
 			memset(&flt_rule_entry, 0, sizeof(struct ipa_flt_rule_add));
 
 			flt_rule_entry.at_rear = true;
@@ -4995,7 +5010,7 @@ int IPACM_Wan::add_embed_dstn_ipv6_rules(struct ipa_flt_rule_add *rules, int rul
 
 			/* Configuring dstn based filtering rule */
 			memcpy(&flt_rule_entry.rule.attrib,
-				   &rx_prop->rx[0].attrib,
+				   &rx_prop->rx[1].attrib,
 				   sizeof(flt_rule_entry.rule.attrib));
 			/* Multiple PDNs may exist so keep meta-data */
 			flt_rule_entry.rule.attrib.attrib_mask |= IPA_FLT_DST_ADDR;
@@ -5004,6 +5019,62 @@ int IPACM_Wan::add_embed_dstn_ipv6_rules(struct ipa_flt_rule_add *rules, int rul
 			flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[1] = ipv6_addr[i][1];
 			flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[2] = ipv6_addr[i][2];
 			flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[3] = ipv6_addr[i][3];
+			flt_rule_entry.rule.attrib.u.v6.dst_addr[0] = 0xFFFFFFFF;
+			flt_rule_entry.rule.attrib.u.v6.dst_addr[1] = 0xFFFFFFFF;
+			flt_rule_entry.rule.attrib.u.v6.dst_addr[2] = 0xFFFFFFFF;
+			flt_rule_entry.rule.attrib.u.v6.dst_addr[3] = 0xFFFFFFFF;
+
+			change_to_network_order(IPA_IP_v6, &flt_rule_entry.rule.attrib);
+
+			memset(&flt_eq, 0, sizeof(flt_eq));
+			memcpy(&flt_eq.attrib, &flt_rule_entry.rule.attrib, sizeof(flt_eq.attrib));
+			flt_eq.ip = iptype;
+			if(0 != ioctl(m_fd_ipa, IPA_IOC_GENERATE_FLT_EQ, &flt_eq))
+			{
+				IPACMERR("Failed to get eq_attrib\n");
+				res = IPACM_FAILURE;
+				goto fail;
+			}
+
+			memcpy(&flt_rule_entry.rule.eq_attrib,
+				   &flt_eq.eq_attrib,
+				   sizeof(flt_rule_entry.rule.eq_attrib));
+
+			memcpy(&(rules[rule_offset]), &flt_rule_entry, sizeof(struct ipa_flt_rule_add));
+			IPACMDBG_H("embedded dstn based index %d, rule offset %d\n",
+					   flt_rule_entry.rule.rt_tbl_idx, rule_offset);
+			rule_offset++;
+			IPACM_Wan::num_v6_flt_rule++;
+		}
+
+		/* Apply the embedded based rules for secondary address as well */
+		for (int i = 0; i < sec_num_dft_rt_v6; i++)
+		{
+			memset(&flt_rule_entry, 0, sizeof(struct ipa_flt_rule_add));
+
+			flt_rule_entry.at_rear = true;
+			flt_rule_entry.flt_rule_hdl = -1;
+			flt_rule_entry.status = -1;
+
+			flt_rule_entry.rule.retain_hdr = 1;
+			flt_rule_entry.rule.to_uc = 0;
+			flt_rule_entry.rule.eq_attrib_type = 1;
+			flt_rule_entry.rule.action = IPA_PASS_TO_ROUTING;
+			if (IPACM_Iface::ipacmcfg->isIPAv3Supported())
+				flt_rule_entry.rule.hashable = true;
+			flt_rule_entry.rule.rt_tbl_idx = 0;
+
+			/* Configuring dstn based filtering rule */
+			memcpy(&flt_rule_entry.rule.attrib,
+				   &rx_prop->rx[1].attrib,
+				   sizeof(flt_rule_entry.rule.attrib));
+			/* Multiple PDNs may exist so keep meta-data */
+			flt_rule_entry.rule.attrib.attrib_mask |= IPA_FLT_DST_ADDR;
+
+			flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[0] = sec_ipv6_addr[i][0];
+			flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[1] = sec_ipv6_addr[i][1];
+			flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[2] = sec_ipv6_addr[i][2];
+			flt_rule_entry.rule.attrib.u.v6.dst_addr_mask[3] = sec_ipv6_addr[i][3];
 			flt_rule_entry.rule.attrib.u.v6.dst_addr[0] = 0xFFFFFFFF;
 			flt_rule_entry.rule.attrib.u.v6.dst_addr[1] = 0xFFFFFFFF;
 			flt_rule_entry.rule.attrib.u.v6.dst_addr[2] = 0xFFFFFFFF;

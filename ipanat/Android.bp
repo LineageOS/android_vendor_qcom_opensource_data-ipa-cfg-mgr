@@ -1,7 +1,7 @@
 
 
 cc_library_shared {
-    name: "libipanat",
+    name: "libipanat_legacy",
 
     header_libs: ["device_kernel_headers"]+["qti_kernel_headers"],
 

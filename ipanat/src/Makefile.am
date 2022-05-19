@@ -42,18 +42,18 @@ library_include_HEADERS = \
   ../inc/ipa_table.h
 
 if KERNELMODULES
-noinst_LIBRARIES = libipanat.a
-libipanat_a_C = @C@
-libipanat_a_CC = @CC@
-libipanat_a_SOURCES = $(c_sources) $(cpp_sources)
-libipanat_a_CFLAGS = $(AM_CFLAGS) $(common_CFLAGS)
-libipanat_a_CXXFLAGS = $(AM_CFLAGS) $(common_CPPFLAGS)
+noinst_LIBRARIES = libipanat_legacy.a
+libipanat_legacy_a_C = @C@
+libipanat_legacy_a_CC = @CC@
+libipanat_legacy_a_SOURCES = $(c_sources) $(cpp_sources)
+libipanat_legacy_a_CFLAGS = $(AM_CFLAGS) $(common_CFLAGS)
+libipanat_legacy_a_CXXFLAGS = $(AM_CFLAGS) $(common_CPPFLAGS)
 else
-lib_LTLIBRARIES = libipanat.la
-libipanat_la_C = @C@
-libipanat_la_CC = @CC@
-libipanat_la_SOURCES = $(c_sources) $(cpp_sources)
-libipanat_la_CFLAGS = $(AM_CFLAGS) $(common_CFLAGS)
-libipanat_la_CXXFLAGS = $(AM_CFLAGS) $(common_CPPFLAGS)
-libipanat_la_LDFLAGS = -shared $(common_LDFLAGS) -version-info 1:0:0
+lib_LTLIBRARIES = libipanat_legacy.la
+libipanat_legacy_la_C = @C@
+libipanat_legacy_la_CC = @CC@
+libipanat_legacy_la_SOURCES = $(c_sources) $(cpp_sources)
+libipanat_legacy_la_CFLAGS = $(AM_CFLAGS) $(common_CFLAGS)
+libipanat_legacy_la_CXXFLAGS = $(AM_CFLAGS) $(common_CPPFLAGS)
+libipanat_legacy_la_LDFLAGS = -shared $(common_LDFLAGS) -version-info 1:0:0
 endif

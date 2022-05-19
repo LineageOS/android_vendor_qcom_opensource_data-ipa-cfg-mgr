@@ -37,10 +37,10 @@ ipanattest_SOURCES = \
 
 bin_PROGRAMS  =  ipanattest
 
-requiredlibs =  ../src/libipanat.la
+requiredlibs =  ../src/libipanat_legacy.la
 
 ipanattest_LDADD =  $(requiredlibs)
 
-LOCAL_MODULE := libipanat
+LOCAL_MODULE := libipanat_legacy
 LOCAL_PRELINK_MODULE := false
 include $(BUILD_SHARED_LIBRARY)

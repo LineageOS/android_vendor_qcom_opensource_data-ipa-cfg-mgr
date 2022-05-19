@@ -45,7 +45,7 @@ LOCAL_SRC_FILES := \
 		ipa_nat_test999.c \
 		main.c
 
-LOCAL_SHARED_LIBRARIES := libipanat
+LOCAL_SHARED_LIBRARIES := libipanat_legacy
 
 LOCAL_MODULE_TAGS := debug
 LOCAL_MODULE_PATH := $(TARGET_OUT_DATA)/kernel-tests/ip_accelerator

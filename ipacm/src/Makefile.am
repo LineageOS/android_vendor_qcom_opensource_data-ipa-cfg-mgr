@@ -29,7 +29,7 @@ ipacm_SOURCES =	IPACM_Main.cpp \
 bin_PROGRAMS  =  ipacm
 
 requiredlibs =  ${LIBXML_LIB} -lxml2 -lpthread -lnetfilter_conntrack -lnfnetlink\
-               ../../ipanat/src/libipanat.la
+               ../../ipanat/src/libipanat_legacy.la
 
 AM_CPPFLAGS += "-std=c++0x"
 
@@ -44,7 +44,7 @@ ipacm_CPPFLAGS = $(AM_CPPFLAGS)
 endif
 ipacm_LDADD =  $(requiredlibs)
 
-LOCAL_MODULE := libipanat
+LOCAL_MODULE := libipanat_legacy
 LOCAL_PRELINK_MODULE := false
 include $(BUILD_SHARED_LIBRARY)
 

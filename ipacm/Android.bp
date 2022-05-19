@@ -44,7 +44,7 @@ cc_binary {
 
     shared_libs: [
 	"liboffloadhal",
-	"libipanat",
+	"libipanat_legacy",
 	"libxml2",
 	"libnfnetlink",
 	"libnetfilter_conntrack",

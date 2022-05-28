@@ -332,7 +332,7 @@ void* ipa_driver_msg_notifier(void *param)
 			if(data_fid == NULL)
 			{
 				IPACMERR("unable to allocate memory for event_wlan data_fid\n");
-				return NULL;
+				continue;
 			}
 			ipa_get_if_index(event_wlan->name, &(data_fid->if_index));
 			evt_data.event = IPA_WLAN_AP_LINK_UP_EVENT;
@@ -349,7 +349,7 @@ void* ipa_driver_msg_notifier(void *param)
 			if(data_fid == NULL)
 			{
 				IPACMERR("unable to allocate memory for event_wlan data_fid\n");
-				return NULL;
+				continue;
 			}
 			ipa_get_if_index(event_wlan->name, &(data_fid->if_index));
 			evt_data.event = IPA_WLAN_LINK_DOWN_EVENT;
@@ -365,7 +365,7 @@ void* ipa_driver_msg_notifier(void *param)
 			if(data == NULL)
 			{
 				IPACMERR("unable to allocate memory for event_wlan data_fid\n");
-				return NULL;
+				continue;
 			}
 			memcpy(data->mac_addr,
 				 event_wlan->mac_addr,
@@ -385,7 +385,7 @@ void* ipa_driver_msg_notifier(void *param)
 			if(data_fid == NULL)
 			{
 				IPACMERR("unable to allocate memory for event_wlan data_fid\n");
-				return NULL;
+				continue;
 			}
 			ipa_get_if_index(event_wlan->name, &(data_fid->if_index));
 			evt_data.event = IPA_WLAN_LINK_DOWN_EVENT;
@@ -401,8 +401,8 @@ void* ipa_driver_msg_notifier(void *param)
 		        data = (ipacm_event_data_mac *)malloc(sizeof(ipacm_event_data_mac));
 		        if (data == NULL)
 		        {
-		    	        IPACMERR("unable to allocate memory for event_wlan data\n");
-		    	        return NULL;
+				IPACMERR("unable to allocate memory for event_wlan data\n");
+				continue;
 		        }
 			memcpy(data->mac_addr,
 						 event_wlan->mac_addr,
@@ -424,7 +424,7 @@ void* ipa_driver_msg_notifier(void *param)
 			if(data_wigig == NULL)
 			{
 				IPACMERR("unable to allocate memory for event_wigig data\n");
-				return NULL;
+				continue;
 			}
 			memcpy(data_wigig->mac_addr,
 				event_wigig->client_mac_addr,
@@ -442,7 +442,7 @@ void* ipa_driver_msg_notifier(void *param)
 			if(event_ex_o.num_of_attribs > IPA_DRIVER_WLAN_EVENT_MAX_OF_ATTRIBS)
 			{
 				IPACMERR("buffer size overflow\n");
-				return NULL;
+				continue;
 			}
 			length = sizeof(ipa_wlan_msg_ex)+ event_ex_o.num_of_attribs * sizeof(ipa_wlan_hdr_attrib_val);
 			IPACMDBG_H("num_of_attribs %d, length %d\n", event_ex_o.num_of_attribs, length);
@@ -450,15 +450,15 @@ void* ipa_driver_msg_notifier(void *param)
 			if(event_ex == NULL )
 			{
 				IPACMERR("Unable to allocate memory\n");
-				return NULL;
+				continue;
 			}
 			memcpy(event_ex, buffer + sizeof(struct ipa_msg_meta), length);
 			data_ex = (ipacm_event_data_wlan_ex *)malloc(sizeof(ipacm_event_data_wlan_ex) + event_ex_o.num_of_attribs * sizeof(ipa_wlan_hdr_attrib_val));
-		    if (data_ex == NULL)
-		    {
+			if (data_ex == NULL)
+			{
 				IPACMERR("unable to allocate memory for event data\n");
-		    	return NULL;
-		    }
+				continue;
+			}
 			data_ex->num_of_attribs = event_ex->num_of_attribs;
 
 			memcpy(data_ex->attribs,
@@ -474,7 +474,7 @@ void* ipa_driver_msg_notifier(void *param)
 			if(new_neigh_data == NULL)
 			{
 				IPACMERR("Failed to allocate memory.\n");
-				return NULL;
+				continue;
 			}
 			memset(new_neigh_data, 0, sizeof(ipacm_event_data_all));
 			new_neigh_data->iptype = IPA_IP_v6;
@@ -511,8 +511,8 @@ void* ipa_driver_msg_notifier(void *param)
 		        data = (ipacm_event_data_mac *)malloc(sizeof(ipacm_event_data_mac));
 		        if (data == NULL)
 		        {
-		    	        IPACMERR("unable to allocate memory for event_wlan data\n");
-		    	        return NULL;
+				IPACMERR("unable to allocate memory for event_wlan data\n");
+				continue;
 		        }
 			memcpy(data->mac_addr,
 						 event_wlan->mac_addr,
@@ -531,8 +531,8 @@ void* ipa_driver_msg_notifier(void *param)
 		        data = (ipacm_event_data_mac *)malloc(sizeof(ipacm_event_data_mac));
 		        if (data == NULL)
 		        {
-		    	        IPACMERR("unable to allocate memory for event_wlan data\n");
-		    	        return NULL;
+				IPACMERR("unable to allocate memory for event_wlan data\n");
+				continue;
 		        }
 			memcpy(data->mac_addr,
 						 event_wlan->mac_addr,
@@ -551,8 +551,8 @@ void* ipa_driver_msg_notifier(void *param)
 		        data = (ipacm_event_data_mac *)malloc(sizeof(ipacm_event_data_mac));
 		        if (data == NULL)
 		        {
-		    	       IPACMERR("unable to allocate memory for event_wlan data\n");
-		    	       return NULL;
+				IPACMERR("unable to allocate memory for event_wlan data\n");
+				continue;
 		        }
 			memcpy(data->mac_addr,
 						 event_wlan->mac_addr,
@@ -569,7 +569,7 @@ void* ipa_driver_msg_notifier(void *param)
 			if(data_fid == NULL)
 			{
 				IPACMERR("unable to allocate memory for event_ecm data_fid\n");
-				return NULL;
+				continue;
 			}
 			data_fid->if_index = event_ecm.ifindex;
 			evt_data.event = IPA_USB_LINK_UP_EVENT;
@@ -583,7 +583,7 @@ void* ipa_driver_msg_notifier(void *param)
 			if(data_fid == NULL)
 			{
 				IPACMERR("unable to allocate memory for event_ecm data_fid\n");
-				return NULL;
+				continue;
 			}
 			data_fid->if_index = event_ecm.ifindex;
 			evt_data.event = IPA_LINK_DOWN_EVENT;
@@ -597,7 +597,7 @@ void* ipa_driver_msg_notifier(void *param)
 			if(data_iptype == NULL)
 			{
 				IPACMERR("unable to allocate memory for event_ecm data_iptype\n");
-				return NULL;
+				continue;
 			}
 			ipa_get_if_index(event_wan.upstream_ifname, &(data_iptype->if_index));
 			ipa_get_if_index(event_wan.tethered_ifname, &(data_iptype->if_index_tether));
@@ -624,7 +624,7 @@ void* ipa_driver_msg_notifier(void *param)
 			if(data_iptype == NULL)
 			{
 				IPACMERR("unable to allocate memory for event_ecm data_iptype\n");
-				return NULL;
+				continue;
 			}
 			ipa_get_if_index(event_wan.upstream_ifname, &(data_iptype->if_index));
 			ipa_get_if_index(event_wan.tethered_ifname, &(data_iptype->if_index_tether));
@@ -643,7 +643,7 @@ void* ipa_driver_msg_notifier(void *param)
 			if(data_fid == NULL)
 			{
 				IPACMERR("unable to allocate memory for event data_fid\n");
-				return NULL;
+				continue;
 			}
 			ipa_get_if_index(event_wan.upstream_ifname, &(data_fid->if_index));
 			evt_data.event = IPA_WAN_EMBMS_LINK_UP_EVENT;
@@ -688,7 +688,7 @@ void* ipa_driver_msg_notifier(void *param)
 			if(data_fid == NULL)
 			{
 				IPACMERR("unable to allocate memory for xlat event\n");
-				return NULL;
+				continue;
 			}
 			ipa_get_if_index(event_wan.upstream_ifname, &(data_fid->if_index));
 			evt_data.event = IPA_LINK_UP_EVENT;
@@ -702,7 +702,7 @@ void* ipa_driver_msg_notifier(void *param)
 			if(data_fid == NULL)
 			{
 				IPACMERR("unable to allocate memory for xlat event\n");
-				return NULL;
+				continue;
 			}
 			ipa_get_if_index(event_wan.upstream_ifname, &(data_fid->if_index));
 			evt_data.event = IPA_WAN_XLAT_CONNECT_EVENT;
@@ -716,7 +716,7 @@ void* ipa_driver_msg_notifier(void *param)
 			if(data_tethering_stats == NULL)
 			{
 				IPACMERR("unable to allocate memory for event data_tethering_stats\n");
-				return NULL;
+				continue;
 			}
 			memcpy(data_tethering_stats,
 					 &event_data_stats,
@@ -733,7 +733,7 @@ void* ipa_driver_msg_notifier(void *param)
 			if(data_network_stats == NULL)
 			{
 				IPACMERR("unable to allocate memory for event data_network_stats\n");
-				return NULL;
+				continue;
 			}
 			memcpy(data_network_stats,
 					 &event_network_stats,
@@ -801,7 +801,7 @@ void* ipa_driver_msg_notifier(void *param)
 			if(vlan_info == NULL)
 			{
 				IPACMERR("Failed to allocate memory.\n");
-				return NULL;
+				continue;
 			}
 			memcpy(vlan_info, buffer + sizeof(struct ipa_msg_meta), sizeof(*vlan_info));
 			evt_data.event = IPA_ADD_VLAN_IFACE;
@@ -813,7 +813,7 @@ void* ipa_driver_msg_notifier(void *param)
 			if(vlan_info == NULL)
 			{
 				IPACMERR("Failed to allocate memory.\n");
-				return NULL;
+				continue;
 			}
 			memcpy(vlan_info, buffer + sizeof(struct ipa_msg_meta), sizeof(*vlan_info));
 			evt_data.event = IPA_DEL_VLAN_IFACE;
@@ -825,7 +825,7 @@ void* ipa_driver_msg_notifier(void *param)
 			if(mapping == NULL)
 			{
 				IPACMERR("Failed to allocate memory.\n");
-				return NULL;
+				continue;
 			}
 			memcpy(mapping, buffer + sizeof(struct ipa_msg_meta), sizeof(*mapping));
 			evt_data.event = IPA_ADD_L2TP_VLAN_MAPPING;
@@ -837,7 +837,7 @@ void* ipa_driver_msg_notifier(void *param)
 			if(mapping == NULL)
 			{
 				IPACMERR("Failed to allocate memory.\n");
-				return NULL;
+				continue;
 			}
 			memcpy(mapping, buffer + sizeof(struct ipa_msg_meta), sizeof(*mapping));
 			evt_data.event = IPA_DEL_L2TP_VLAN_MAPPING;
@@ -853,7 +853,7 @@ void* ipa_driver_msg_notifier(void *param)
 			{
 				IPACMERR("qmap_id (%d) beyond the Max range (%d), abort\n",
 				coalesce_info.qmap_id, IPA_MAX_NUM_SW_PDNS);
-				return NULL;
+				continue;
 			}
 			IPACM_Wan::coalesce_config(coalesce_info.qmap_id, coalesce_info.tcp_enable, coalesce_info.udp_enable);
 			/* Notify all LTE instance to do RSC configuration */
@@ -869,7 +869,7 @@ void* ipa_driver_msg_notifier(void *param)
 			{
 				IPACMERR("qmap_id (%d) beyond the Max range (%d), abort\n",
 				coalesce_info.qmap_id, IPA_MAX_NUM_SW_PDNS);
-				return NULL;
+				continue;
 			}
 			IPACM_Wan::coalesce_config(coalesce_info.qmap_id, false, false);
 			/* Notify all LTE instance to do RSC configuration */
@@ -884,7 +884,7 @@ void* ipa_driver_msg_notifier(void *param)
 			if(mtu_event == NULL)
 			{
 				IPACMERR("Failed to allocate memory.\n");
-				return NULL;
+				continue;
 			}
 			mtu_info = &(mtu_event->mtu_info);
 			memcpy(mtu_info, buffer + sizeof(struct ipa_msg_meta), sizeof(struct ipa_mtu_info));
@@ -894,7 +894,7 @@ void* ipa_driver_msg_notifier(void *param)
 			{
 				IPACMERR("ip_type (%d) beyond the Max range (%d), abort\n",
 				mtu_info->ip_type, IPA_IP_MAX);
-				return NULL;
+				continue;
 			}
 
 			ipa_get_if_index(mtu_info->if_name, &(mtu_event->if_index));

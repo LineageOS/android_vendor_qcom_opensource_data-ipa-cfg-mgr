@@ -868,12 +868,11 @@ static int _smFirstTbl(
 {
 	table_add_args* args = (table_add_args*) arb_data_ptr;
 
-	uint32_t  public_ip_addr    = args->public_ip_addr;
-	uint16_t  number_of_entries = args->number_of_entries;
-	uint32_t* tbl_hdl_ptr       = args->tbl_hdl;
 	const char* mem_type_ptr    = args->mem_type_ptr;
 
 	int ret;
+
+	UNUSED(trigger);
 
 	IPADBG("In\n");
 

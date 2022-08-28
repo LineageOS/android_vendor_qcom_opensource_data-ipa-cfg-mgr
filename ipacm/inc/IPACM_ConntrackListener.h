@@ -106,7 +106,9 @@ private:
 	void CheckSTAClient(const nat_table_entry *, bool *);
 	int CheckNatIface(ipacm_event_data_all *, bool *);
 	void HandleNonNatIPAddr(void *, bool);
+#ifdef IPA_MOVE_NAT_EVENT_MAX
 	void HandleNatTableMove(void *in_param);
+#endif
 
 #ifdef CT_OPT
 	void ProcessCTV6Message(void *);

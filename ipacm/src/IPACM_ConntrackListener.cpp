@@ -65,7 +65,9 @@ IPACM_ConntrackListener::IPACM_ConntrackListener()
 	 IPACM_EvtDispatcher::registr(IPA_HANDLE_LAN_UP, this);
 	 IPACM_EvtDispatcher::registr(IPA_NEIGH_CLIENT_IP_ADDR_ADD_EVENT, this);
 	 IPACM_EvtDispatcher::registr(IPA_NEIGH_CLIENT_IP_ADDR_DEL_EVENT, this);
+#ifdef IPA_MOVE_NAT_EVENT_MAX
 	 IPACM_EvtDispatcher::registr(IPA_MOVE_NAT_TBL_EVENT, this);
+#endif
 
 #ifdef CT_OPT
 	 p_lan2lan = IPACM_LanToLan::getLan2LanInstance();
@@ -145,10 +147,12 @@ void IPACM_ConntrackListener::event_callback(ipa_cm_event_id evt,
 		 IPACMDBG("Received IPA_NEIGH_CLIENT_IP_ADDR_DEL_EVENT event\n");
 		 HandleNonNatIPAddr(data, false);
 		 break;
+#ifdef IPA_MOVE_NAT_EVENT_MAX
 	 case IPA_MOVE_NAT_TBL_EVENT:
 		 IPACMDBG_H("Received IPA_MOVE_NAT_TBL_EVENT event\n");
 		 HandleNatTableMove(data);
 		 break;
+#endif
 	 default:
 			IPACMDBG("Ignore cmd %d\n", evt);
 			break;
@@ -1516,6 +1520,7 @@ void IPACM_ConntrackListener::processCacheConntrack(void)
 	IPACMDBG("Exit:\n");
 }
 
+#ifdef IPA_MOVE_NAT_EVENT_MAX
 void IPACM_ConntrackListener::HandleNatTableMove(void *in_param)
 {
 	int ret;
@@ -1549,4 +1554,4 @@ void IPACM_ConntrackListener::HandleNatTableMove(void *in_param)
 
 	close(fd_wwan_ioctl);
 }
-
+#endif

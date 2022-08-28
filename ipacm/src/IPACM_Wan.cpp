@@ -1009,14 +1009,9 @@ fail:
 	/* handle del_address event */
 	int IPACM_Wan::handle_addr_del_evt(ipacm_event_data_addr *data)
 	{
-		bool result;
 
-		const int NUM_RULES = 1;
 		uint32_t num_ipv6_addr, rt_idx = 0;
-		int res = IPACM_SUCCESS,len;
-#ifdef FEATURE_IPACM_HAL
-		IPACM_OffloadManager* OffloadMng;
-#endif
+		int res = IPACM_SUCCESS;
 		bool sec_addr = false, pri_addr = false;
 		int i = 0;
 		bool wan_active = false;

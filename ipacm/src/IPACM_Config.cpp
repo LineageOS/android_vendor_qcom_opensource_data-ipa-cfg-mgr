@@ -125,7 +125,9 @@ const char *ipacm_event_name[] = {
 	__stringify(IPA_LAN_DELETE_SELF),                      /* ipacm_event_data_fid */
 	__stringify(IPA_WIGIG_CLIENT_ADD_EVENT),               /* ipacm_event_data_mac_ep */
 	__stringify(IPA_WIGIG_FST_SWITCH),                     /* ipacm_event_data_fst */
+#ifdef IPA_MOVE_NAT_EVENT_MAX
 	__stringify(IPA_MOVE_NAT_TBL_EVENT),                   /* ipacm_event_move_nat */
+#endif
 	__stringify(IPACM_EVENT_MAX)
 };
 

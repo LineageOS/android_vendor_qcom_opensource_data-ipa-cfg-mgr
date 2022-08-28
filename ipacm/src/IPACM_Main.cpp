@@ -305,8 +305,10 @@ void* ipa_driver_msg_notifier(void *param)
 #endif
 
 	param = NULL;
+#ifdef IPA_MOVE_NAT_EVENT_MAX
 	struct ipa_move_nat_req_msg_v01 *move_nat;
 	ipacm_event_move_nat *move_nat_data;
+#endif
 
 	fd = open(IPA_DRIVER, O_RDWR);
 	if (fd < 0)
@@ -948,6 +950,7 @@ void* ipa_driver_msg_notifier(void *param)
 			break;
 #endif
 
+#ifdef IPA_MOVE_NAT_EVENT_MAX
 		case IPA_MOVE_NAT_TABLE:
 			move_nat = (struct ipa_move_nat_req_msg_v01 *)(buffer + sizeof(struct ipa_msg_meta));
 			IPACMDBG_H("received IPA_MOVE_NAT_TABLE direction %s\n",
@@ -964,6 +967,7 @@ void* ipa_driver_msg_notifier(void *param)
 			evt_data.event = IPA_MOVE_NAT_TBL_EVENT;
 			evt_data.evt_data = move_nat_data;
 			break;
+#endif
 
 		default:
 			IPACMDBG_H("Unhandled message type: %d\n", event_hdr.msg_type);

@@ -318,6 +318,7 @@ int NatApp::DeleteTable(uint32_t pub_ip)
 	return 0;
 }
 
+#ifdef IPA_MOVE_NAT_EVENT_MAX
 int NatApp::MoveTable(bool to_ddr)
 {
 	int ret;
@@ -332,6 +333,7 @@ int NatApp::MoveTable(bool to_ddr)
 
 	return ret;
 }
+#endif
 
 /* Check for duplicate entries */
 bool NatApp::ChkForDup(const nat_table_entry *rule)

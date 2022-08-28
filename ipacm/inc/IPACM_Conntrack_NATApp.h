@@ -119,7 +119,9 @@ public:
 	int AddTable(uint32_t, uint8_t mux_id);
 	uint32_t GetTableHdl(uint32_t);
 	int DeleteTable(uint32_t);
+#ifdef IPA_MOVE_NAT_EVENT_MAX
 	int MoveTable(bool to_ddr);
+#endif
 
 	int AddEntry(const nat_table_entry *);
 	int DeleteEntry(const nat_table_entry *);

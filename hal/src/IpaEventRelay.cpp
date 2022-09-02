@@ -29,49 +29,28 @@
 #define LOG_TAG "IPAHALService/IpaEventRelay"
 /* External Includes */
 #include <cutils/log.h>
-//#include <hidl/Status.h> //TODO: Might be easier to return Status
 
 /* HIDL Includes */
-#include <android/hardware/tetheroffload/control/1.1/ITetheringOffloadCallback.h>
+#include <android/hardware/tetheroffload/control/1.0/ITetheringOffloadCallback.h>
 
 /* Internal Includes */
 #include "IpaEventRelay.h"
 
 /* Namespace pollution avoidance */
-using ::android::hardware::Return;
-// using ::android::hardware::Status;
-using ::android::hardware::tetheroffload::control::V1_1::ITetheringOffloadCallback;
+using ::android::hardware::tetheroffload::control::V1_0::ITetheringOffloadCallback;
+using ::android::hardware::tetheroffload::control::V1_0::OffloadCallbackEvent;
 
 
 IpaEventRelay::IpaEventRelay(
-        const ::android::sp<V1_0::ITetheringOffloadCallback>& cb,
-        const ::android::sp<V1_1::ITetheringOffloadCallback>& cb_1_1) : mFramework(cb), mFramework_1_1(cb_1_1) {
+        const ::android::sp<ITetheringOffloadCallback>& cb) : mFramework(cb) {
 } /* IpaEventRelay */
-
-using OnEventVersion = std::function<Return<void>()>;
-void IpaEventRelay::sendEvent(OffloadCallbackEvent event) {
-    // Events need to be sent for the version passed in and all versions defined after that.
-    // This ensures all new versions get the correct events, but vrsion where events where not
-    // defined do not.
-    Return<void> ret;
-    if(mFramework_1_1 != nullptr) {
-        ALOGI("Triggering onEvent_1_1");
-        ret = mFramework_1_1->onEvent_1_1(event);
-    }
-    else { // Fallback to V1_0
-        ALOGI("Triggering onEvent");
-        ret = mFramework->onEvent(
-            (::android::hardware::tetheroffload::control::V1_0::OffloadCallbackEvent) event);
-    }
-
-    if (!ret.isOk()) {
-        ALOGE("Triggering onEvent Callback failed.");
-    }
-}
 
 void IpaEventRelay::onOffloadStarted() {
     ALOGI("onOffloadStarted()");
-    sendEvent(OffloadCallbackEvent::OFFLOAD_STARTED);
+    auto ret = mFramework->onEvent(OffloadCallbackEvent::OFFLOAD_STARTED);
+    if (!ret.isOk()) {
+        ALOGE("Triggering OffloadStarted Callback failed.");
+    }
 } /* onOffloadStarted */
 
 void IpaEventRelay::onOffloadStopped(StoppedReason reason) {
@@ -84,10 +63,16 @@ void IpaEventRelay::onOffloadStopped(StoppedReason reason) {
          */
     }
     else if ( reason == StoppedReason::ERROR ) {
-        sendEvent(OffloadCallbackEvent::OFFLOAD_STOPPED_ERROR);
+        auto ret = mFramework->onEvent(OffloadCallbackEvent::OFFLOAD_STOPPED_ERROR);
+        if (!ret.isOk()) {
+            ALOGE("Triggering OffloadStopped Callback failed.");
+        }
     }
     else if ( reason == StoppedReason::UNSUPPORTED ) {
-        sendEvent(OffloadCallbackEvent::OFFLOAD_STOPPED_UNSUPPORTED);
+        auto ret = mFramework->onEvent(OffloadCallbackEvent::OFFLOAD_STOPPED_UNSUPPORTED);
+        if (!ret.isOk()) {
+            ALOGE("Triggering OffloadStopped Callback failed.");
+        }
     }
     else {
         ALOGE("Unknown stopped reason(%d)", reason);
@@ -96,16 +81,16 @@ void IpaEventRelay::onOffloadStopped(StoppedReason reason) {
 
 void IpaEventRelay::onOffloadSupportAvailable() {
     ALOGI("onOffloadSupportAvailable()");
-    sendEvent(OffloadCallbackEvent::OFFLOAD_SUPPORT_AVAILABLE);
+    auto ret = mFramework->onEvent(OffloadCallbackEvent::OFFLOAD_SUPPORT_AVAILABLE);
+    if (!ret.isOk()) {
+        ALOGE("Triggering OffloadSupportAvailable Callback failed.");
+    }
 } /* onOffloadSupportAvailable */
 
 void IpaEventRelay::onLimitReached() {
     ALOGI("onLimitReached()");
-    sendEvent(OffloadCallbackEvent::OFFLOAD_STOPPED_LIMIT_REACHED);
+    auto ret = mFramework->onEvent(OffloadCallbackEvent::OFFLOAD_STOPPED_LIMIT_REACHED);
+    if (!ret.isOk()) {
+        ALOGE("Triggering LimitReached Callback failed.");
+    }
 } /* onLimitReached */
-
-/** V1_1 API's **/
-void IpaEventRelay::onWarningReached() {
-    ALOGI("onWarningReached()");
-    sendEvent(OffloadCallbackEvent::OFFLOAD_WARNING_REACHED);
-} /* onWarningReached */

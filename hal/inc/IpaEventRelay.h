@@ -32,29 +32,24 @@
 #include <hidl/HidlTransportSupport.h>
 
 /* HIDL Includes */
-#include <android/hardware/tetheroffload/control/1.1/ITetheringOffloadCallback.h>
+#include <android/hardware/tetheroffload/control/1.0/ITetheringOffloadCallback.h>
 
 /* Internal Includes */
 #include "IOffloadManager.h"
 
 /* Namespace pollution avoidance */
-using namespace android::hardware::tetheroffload::control;
-using ::android::hardware::tetheroffload::control::V1_1::OffloadCallbackEvent;
+using ::android::hardware::tetheroffload::control::V1_0::ITetheringOffloadCallback;
+
 
 class IpaEventRelay : public IOffloadManager::IpaEventListener {
 public:
-    IpaEventRelay(const ::android::sp<V1_0::ITetheringOffloadCallback>& /* 1.0 cb */,
-                  const ::android::sp<V1_1::ITetheringOffloadCallback>& /* 1.1 cb */);
+    IpaEventRelay(const ::android::sp<ITetheringOffloadCallback>& /* cb */);
     /* ----------------------- IPA EVENT LISTENER --------------------------- */
     void onOffloadStarted();
     void onOffloadStopped(StoppedReason /* reason */);
     void onOffloadSupportAvailable();
     void onLimitReached();
-    void onWarningReached();
 private:
-    const ::android::sp<V1_0::ITetheringOffloadCallback>& mFramework;
-    const ::android::sp<V1_1::ITetheringOffloadCallback>& mFramework_1_1;
-
-    void sendEvent(OffloadCallbackEvent);
+    const ::android::sp<ITetheringOffloadCallback>& mFramework;
 }; /* IpaEventRelay */
 #endif /* _IPA_EVENT_RELAY_H_ */

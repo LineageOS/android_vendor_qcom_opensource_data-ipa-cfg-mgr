@@ -31,7 +31,7 @@
 
 /* HIDL Includes */
 #include <android/hardware/tetheroffload/config/1.0/IOffloadConfig.h>
-#include <android/hardware/tetheroffload/control/1.1/IOffloadControl.h>
+#include <android/hardware/tetheroffload/control/1.0/IOffloadControl.h>
 #include <hidl/HidlTransportSupport.h>
 
 /* External Includes */
@@ -59,11 +59,10 @@ using ::std::map;
 using ::std::string;
 using ::std::vector;
 
-using namespace android::hardware::tetheroffload::control;
-using ::android::sp;
 using ::android::hardware::tetheroffload::config::V1_0::IOffloadConfig;
-using ::android::hardware::tetheroffload::control::V1_1::IOffloadControl;
-using ::android::hardware::tetheroffload::control::V1_1::ITetheringOffloadCallback;
+using ::android::hardware::tetheroffload::control::V1_0::IOffloadControl;
+
+using ::android::hardware::tetheroffload::control::V1_0::ITetheringOffloadCallback;
 
 #define KERNEL_PAGE 4096
 
@@ -132,9 +131,9 @@ public:
             const hidl_handle& /* fd2 */,
             setHandles_cb /* hidl_cb */);
 
-    /* IOffloadControl 1.0 */
+    /* IOffloadControl */
     Return<void> initOffload(
-            const ::android::sp<::android::hardware::tetheroffload::control::V1_0::ITetheringOffloadCallback>& /* cb */,
+            const ::android::sp<ITetheringOffloadCallback>& /* cb */,
             initOffload_cb /* hidl_cb */);
     Return<void> stopOffload(
             stopOffload_cb /* hidl_cb */);
@@ -162,12 +161,6 @@ public:
             const hidl_string& /* iface */,
             const hidl_string& /* prefix */,
             removeDownstream_cb /* hidl_cb */);
-    /* IOffloadControl 1.1 */
-    Return<void> setDataWarningAndLimit(
-            const hidl_string& /* upstream */,
-            uint64_t /* warningBytes */,
-            uint64_t /* limitBytes */,
-            setDataWarningAndLimit_cb /* hidl_cb */);
 
 private:
     typedef struct BoolResult {
@@ -200,8 +193,7 @@ private:
     hidl_handle mHandle1;
     hidl_handle mHandle2;
     LocalLogBuffer mLogs;
-    android::sp<V1_0::ITetheringOffloadCallback> mCb;
-    android::sp<V1_1::ITetheringOffloadCallback> mCb_1_1;
+    ::android::sp<ITetheringOffloadCallback> mCb;
     IpaEventRelay *mCbIpa;
     CtUpdateAmbassador *mCbCt;
 }; /* HAL */

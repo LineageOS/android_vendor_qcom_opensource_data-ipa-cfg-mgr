@@ -60,6 +60,7 @@ using Prefix = ::IOffloadManager::Prefix;
 using ::std::map;
 using ::std::vector;
 
+
 /* ------------------------------ PUBLIC ------------------------------------ */
 Return<::android::sp<HAL>> HAL::makeIPAHAL(int version, IOffloadManager* mgr) {
     android::hardware::ProcessState::initWithMmapSize((size_t)(2 * KERNEL_PAGE));
@@ -81,7 +82,6 @@ Return<::android::sp<HAL>> HAL::makeIPAHAL(int version, IOffloadManager* mgr) {
 HAL::HAL(IOffloadManager* mgr) : mLogs("HAL Function Calls", 50) {
     mIPA = mgr;
     mCb.clear();
-    mCb_1_1.clear();
     mCbIpa = nullptr;
     mCbCt = nullptr;
 } /* HAL */
@@ -180,7 +180,7 @@ void HAL::registerEventListeners() {
 void HAL::registerIpaCb() {
     if (isInitialized() && mCbIpa == nullptr) {
         LocalLogBuffer::FunctionLog fl("registerEventListener");
-        mCbIpa = new IpaEventRelay(mCb, mCb_1_1);
+        mCbIpa = new IpaEventRelay(mCb);
         mIPA->registerEventListener(mCbIpa);
         mLogs.addLog(fl);
     } else {
@@ -193,8 +193,6 @@ void HAL::registerIpaCb() {
 void HAL::registerCtCb() {
     if (isInitialized() && mCbCt == nullptr) {
         LocalLogBuffer::FunctionLog fl("registerCtTimeoutUpdater");
-        // We can allways use the 1.0 callback here since it is always guarenteed to
-        // be non-nullptr if any version is created.
         mCbCt = new CtUpdateAmbassador(mCb);
         mIPA->registerCtTimeoutUpdater(mCbCt);
         mLogs.addLog(fl);
@@ -248,7 +246,6 @@ void HAL::clearHandles() {
 } /* clearHandles */
 
 bool HAL::isInitialized() {
-    // Only have to check 1.0 Callback since it will always be created.
     return mCb.get() != nullptr;
 } /* isInitialized */
 
@@ -331,7 +328,7 @@ Return<void> HAL::setHandles(
 /* -------------------------- IOffloadControl ------------------------------- */
 Return<void> HAL::initOffload
 (
-    const ::android::sp<V1_0::ITetheringOffloadCallback>& cb,
+    const ::android::sp<ITetheringOffloadCallback>& cb,
     initOffload_cb hidl_cb
 ) {
     LocalLogBuffer::FunctionLog fl(__func__);
@@ -344,20 +341,11 @@ Return<void> HAL::initOffload
     } else {
         /* Should storing the CB be a function? */
         mCb = cb;
-        mCb_1_1 = V1_1::ITetheringOffloadCallback::castFrom(cb).withDefault(nullptr);
-        // As long as 1 callback version is supported we are fine.
-        if (mCb == nullptr && mCb_1_1 == nullptr) {
-            BoolResult res = makeInputCheckFailure("callbacks are nullptr");
-            hidl_cb(res.success, res.errMsg);
-            fl.setResult(res.success, res.errMsg);
-            mLogs.addLog(fl);
-        } else {
         registerEventListeners();
         BoolResult res = ipaResultToBoolResult(RET::SUCCESS);
         hidl_cb(res.success, res.errMsg);
         fl.setResult(res.success, res.errMsg);
         mLogs.addLog(fl);
-    }
     }
 
     return Void();
@@ -377,7 +365,6 @@ Return<void> HAL::stopOffload
     } else {
         /* Should removing the CB be a function? */
         mCb.clear();
-        mCb_1_1.clear();
         unregisterEventListeners();
 
         RET ipaReturn = mIPA->stopAllOffload();
@@ -425,7 +412,7 @@ Return<void> HAL::setLocalPrefixes
     memset(&res,0,sizeof(BoolResult));
 
     if (!isInitialized()) {
-        res = makeInputCheckFailure("Not initialized");
+        BoolResult res = makeInputCheckFailure("Not initialized");
     } else if(prefixesStr.size() < 1) {
         res = ipaResultToBoolResult(RET::FAIL_INPUT_CHECK);
     } else if (!parser.add(prefixesStr)) {
@@ -574,7 +561,7 @@ Return<void> HAL::addDownstream
     PrefixParser prefixParser;
 
     if (!isInitialized()) {
-        BoolResult res = makeInputCheckFailure("Not initialized (addDownstream)");
+        BoolResult res = makeInputCheckFailure("Not initialized (setUpstreamParameters)");
         hidl_cb(res.success, res.errMsg);
         fl.setResult(res.success, res.errMsg);
     }
@@ -608,7 +595,7 @@ Return<void> HAL::removeDownstream
     PrefixParser prefixParser;
 
     if (!isInitialized()) {
-        BoolResult res = makeInputCheckFailure("Not initialized (removeDownstream)");
+        BoolResult res = makeInputCheckFailure("Not initialized (setUpstreamParameters)");
         hidl_cb(res.success, res.errMsg);
         fl.setResult(res.success, res.errMsg);
     }
@@ -628,34 +615,3 @@ Return<void> HAL::removeDownstream
     mLogs.addLog(fl);
     return Void();
 } /* removeDownstream */
-
-Return<void> HAL::setDataWarningAndLimit
-(
-    const hidl_string& upstream,
-    uint64_t warningBytes,
-    uint64_t limitBytes,
-    setDataWarningAndLimit_cb hidl_cb
-) {
-    LocalLogBuffer::FunctionLog fl(__func__);
-    fl.addArg("upstream", upstream);
-    fl.addArg("warningBytes", warningBytes);
-    fl.addArg("limitBytes", limitBytes);
-
-    // Can only be called from HAL 1.1 so no check here is needed.
-    if (!isInitialized()) {
-        BoolResult res = makeInputCheckFailure("Not initialized (setDataWarningAndLimit)");
-        hidl_cb(res.success, res.errMsg);
-        fl.setResult(res.success, res.errMsg);
-    } else {
-        RET ipaReturn = mIPA->setQuotaWarning(upstream.c_str(), limitBytes, warningBytes);
-        if(ipaReturn == RET::FAIL_TRY_AGAIN) {
-            ipaReturn = RET::SUCCESS;
-        }
-        BoolResult res = ipaResultToBoolResult(ipaReturn);
-        hidl_cb(res.success, res.errMsg);
-        fl.setResult(res.success, res.errMsg);
-    }
-
-    mLogs.addLog(fl);
-    return Void();
-} /* setDataWarningAndLimit */

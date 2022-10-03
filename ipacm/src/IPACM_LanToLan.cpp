@@ -1772,7 +1772,7 @@ void IPACM_LanToLan_Iface::print_data_structure_info()
 	{
 		for(i = 0; i < IPA_HDR_L2_MAX; i++)
 		{
-			IPACMDBG_H("Ref_cnt of peer l2 type %s is %d.\n", ipa_l2_hdr_type[i], ref_cnt_peer_l2_hdr_type[i]);
+			IPACMDBG_H("Ref_cnt of peer l2 type with index %d is %d.\n", i, ref_cnt_peer_l2_hdr_type[i]);
 			if(ref_cnt_peer_l2_hdr_type[i] > 0)
 			{
 				IPACMDBG_H("Hdr proc ctx for peer l2 type %s: %d\n", ipa_l2_hdr_type[i], hdr_proc_ctx_for_inter_interface[i]);

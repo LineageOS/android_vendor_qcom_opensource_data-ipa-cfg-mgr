@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "f98a1fdc_65ba6417",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 19165
+      },
+      "writtenOn": "2022-11-04T18:46:06Z",
+      "side": 1,
+      "message": "Compiles and works on eqs (Moto Edge 30 Ultra)",
+      "revId": "037b3a1a9f1539dfd33155abb15d7fb7dcdfc549",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}

@@ -457,6 +457,7 @@ void* ipa_driver_msg_notifier(void *param)
 			if (data_ex == NULL)
 			{
 				IPACMERR("unable to allocate memory for event data\n");
+				free(event_ex);
 				continue;
 			}
 			data_ex->num_of_attribs = event_ex->num_of_attribs;
@@ -474,6 +475,8 @@ void* ipa_driver_msg_notifier(void *param)
 			if(new_neigh_data == NULL)
 			{
 				IPACMERR("Failed to allocate memory.\n");
+				free(data_ex);
+				free(event_ex);
 				continue;
 			}
 			memset(new_neigh_data, 0, sizeof(ipacm_event_data_all));

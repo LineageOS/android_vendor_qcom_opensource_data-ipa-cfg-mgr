@@ -75,6 +75,9 @@ Skylar Chang
 #include <string.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
+#ifndef in_addr_t
+typedef uint32_t in_addr_t;
+#endif
 #include <IPACM_Wlan.h>
 #include <IPACM_Netlink.h>
 #include <fcntl.h>

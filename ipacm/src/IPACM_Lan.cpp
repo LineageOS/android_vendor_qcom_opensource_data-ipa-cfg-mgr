@@ -1,6 +1,8 @@
 /*
 Copyright (c) 2013-2020, The Linux Foundation. All rights reserved.
 
+Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved
+
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
 met:
@@ -5320,7 +5322,7 @@ int IPACM_Lan::eth_bridge_modify_rt_rule(uint8_t *mac, uint32_t hdr_proc_ctx_hdl
 			rt_rule_entry->rule.hdr_hdl = 0;
 			rt_rule_entry->rule.hdr_proc_ctx_hdl = hdr_proc_ctx_hdl;
 			if (IPACM_Iface::ipacmcfg->isIPAv3Supported())
-				rt_rule_entry->rule.hashable = true;
+				rt_rule_entry->rule.hashable = false;
 			memcpy(&rt_rule_entry->rule.attrib, &tx_prop->tx[index].attrib,
 					sizeof(rt_rule_entry->rule.attrib));
 			if(peer_l2_hdr_type == IPA_HDR_L2_ETHERNET_II)
@@ -5401,7 +5403,7 @@ int IPACM_Lan::eth_bridge_add_flt_rule(uint8_t *mac, uint32_t rt_tbl_hdl, ipa_ip
 		flt_rule_entry.rule.action = IPA_PASS_TO_ROUTING;
 		flt_rule_entry.rule.eq_attrib_type = 0;
 		flt_rule_entry.rule.rt_tbl_hdl = rt_tbl_hdl;
-		flt_rule_entry.rule.hashable = true;
+		flt_rule_entry.rule.hashable = false;
 
 		memcpy(&flt_rule_entry.rule.attrib, &rx_prop->rx[0].attrib, sizeof(flt_rule_entry.rule.attrib));
 		if(tx_prop->tx[0].hdr_l2_type == IPA_HDR_L2_ETHERNET_II)

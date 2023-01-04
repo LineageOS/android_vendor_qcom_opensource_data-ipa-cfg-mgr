@@ -17,6 +17,7 @@ endif #TARGET_USES_QMAA_OVERRIDE_DATA
 endif #TARGET_USES_QMAA
 
 BOARD_IPA_LOW_RAM_EXCP_LIST := bengal
+BOARD_IPA_LOW_RAM_EXCP_LIST += monaco
 
 ifeq ($(TARGET_HAS_LOW_RAM),true)
 ifneq ($(call is-board-platform-in-list,$(BOARD_IPA_LOW_RAM_EXCP_LIST)),true)

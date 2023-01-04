@@ -76,6 +76,9 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#ifndef in_addr_t
+typedef uint32_t in_addr_t;
+#endif
 #include "IPACM_Netlink.h"
 #include "IPACM_Lan.h"
 #include "IPACM_Wan.h"

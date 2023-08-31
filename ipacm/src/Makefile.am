@@ -1,5 +1,4 @@
 AM_CPPFLAGS = -I./../inc \
-	      -I$(top_srcdir)/ipanat/inc \
 	      ${LIBXML_CFLAGS}
 AM_CPPFLAGS += -Wall -Wundef -Wno-trigraphs
 AM_CPPFLAGS	+= -DDEBUG -g -DFEATURE_ETH_BRIDGE_LE -DFEATURE_L2TP
@@ -28,8 +27,8 @@ ipacm_SOURCES =	IPACM_Main.cpp \
 
 bin_PROGRAMS  =  ipacm
 
-requiredlibs =  ${LIBXML_LIB} -lxml2 -lpthread -lnetfilter_conntrack -lnfnetlink\
-               ../../ipanat/src/libipanat.la
+requiredlibs =  ${LIBXML_LIB} -lxml2 -lpthread -lnetfilter_conntrack \
+                -lnfnetlink -lipanat
 
 AM_CPPFLAGS += "-std=c++0x"
 

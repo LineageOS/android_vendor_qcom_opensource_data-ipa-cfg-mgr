@@ -25,6 +25,40 @@ BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
 WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
 OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
 IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted (subject to the limitations in the
+ * disclaimer below) provided that the following conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *
+ *     * Redistributions in binary form must reproduce the above
+ *       copyright notice, this list of conditions and the following
+ *       disclaimer in the documentation and/or other materials provided
+ *       with the distribution.
+ *
+ *     * Neither the name of Qualcomm Innovation Center, Inc. nor the names of its
+ *       contributors may be used to endorse or promote products derived
+ *       from this software without specific prior written permission.
+ *
+ * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
+ * GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
+ * HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+ * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 */
 /*!
 	@file
@@ -109,6 +143,40 @@ bool IPACM_Routing::AddRoutingRule(struct ipa_ioc_add_rt_rule *ruleTable)
 	}
 
 	IPACMDBG_H_LOG("Added routing rule %p\n", ruleTable);
+	return true;
+}
+
+bool IPACM_Routing::AddRoutingRule(struct ipa_ioc_add_rt_rule_v2 *table) {
+	bool isInvalid = false;
+	ipa_rt_rule_add_v2 *rules = reinterpret_cast<ipa_rt_rule_add_v2 *>(table->rules);
+
+	if (!DeviceNodeIsOpened()) {
+		IPACMERR("Device is not opened\n");
+		return false;
+	}
+
+	for(decltype(table->num_rules) i = 0; i < table->num_rules; i++) {
+		if(rules[i].rule.dst > IPA_CLIENT_MAX) {
+			IPACMERR("Invalid destination pipe - dst_pipe:%d, i:%d\n", rules[i].rule.dst, i);
+			isInvalid = true;
+		}
+	}
+
+	if(isInvalid) {
+		return false;
+	}
+
+	int retval = ioctl(m_fd, IPA_IOC_ADD_RT_RULE_V2, table);
+	if (retval) {
+		IPACMERR("Failed adding routing table %p\n", table);
+		return false;
+	}
+
+	for(decltype(table->num_rules) i = 0; i < table->num_rules; i++) {
+			IPACMERR("dst_pipe:%d, i:%d\n", rules[i].rule.dst, i);
+	}
+
+	IPACMDBG_H("Added routing rule %p\n", table);
 	return true;
 }
 

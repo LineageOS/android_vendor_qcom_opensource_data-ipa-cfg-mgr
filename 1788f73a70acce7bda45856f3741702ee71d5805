@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "5ed2aad2_e5d70b5b",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2023-09-18T20:01:58Z",
+      "side": 1,
+      "message": "This is a no-go. We can\u0027t merge this as it will break taro/cape devices using it. For kalama, QCOM moved libipanat to dataipa project.",
+      "revId": "1788f73a70acce7bda45856f3741702ee71d5805",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}

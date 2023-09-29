@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "578f8493_b9682c27",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 21290
+      },
+      "writtenOn": "2023-09-29T16:38:19Z",
+      "side": 1,
+      "message": "fixes ipacm start failure on xiaomi sm8450 without ipacm diag",
+      "revId": "3c0a7c4a067323d92e1091429e5f6bb6e099473f",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}

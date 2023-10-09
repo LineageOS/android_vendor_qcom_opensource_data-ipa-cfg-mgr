@@ -39,7 +39,6 @@ cc_binary {
     ],
 
     init_rc: ["src/ipacm.rc"],
-    clang: true,
     vendor: true,
 
     shared_libs: [

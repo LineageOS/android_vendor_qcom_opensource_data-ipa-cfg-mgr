@@ -29,5 +29,4 @@ cc_library_shared {
         "-Werror",
     ] + ["-DFEATURE_IPA_ANDROID"],
 
-    clang: true,
 }

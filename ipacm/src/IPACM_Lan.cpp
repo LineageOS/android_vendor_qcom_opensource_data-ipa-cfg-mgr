@@ -3709,7 +3709,7 @@ int IPACM_Lan::handle_uplink_filter_rule(ipacm_ext_prop *prop, ipa_ip_type iptyp
 			/* In XLAT UL case TTL needs to be done after IPv4->IPv6 transformation */
 #ifdef IPA_FLTRT_TTL_UPDATE
 			if(IPACM_Iface::ipacmcfg->GetIPAVer() >= IPA_HW_v5_5)
-			flt_rule_entry.rule.ttl_update = true;
+			flt_rule_entry.rule.ttl_update = false;
 #endif
 			/* fill the value of meta-data */
 			value = xlat_mux_id;

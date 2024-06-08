@@ -2,11 +2,13 @@ TARGET_DISABLE_IPACM := false
 
 ifneq ($(TARGET_BOARD_SUFFIX),_au)
 ifneq ($(TARGET_BOARD_SUFFIX),_gvmq)
+ifneq ($(TARGET_BOARD_DERIVATIVE_SUFFIX),_tb)
 #IPACM_DATA
 IPACM_DATA += IPACM_cfg.xml
 IPACM_DATA += IPACM_Filter_cfg.xml
 IPACM_DATA += ipacm
 IPACM_DATA += ipacm.rc
+endif
 endif
 endif
 
@@ -35,6 +37,9 @@ ifeq ($(TARGET_BOARD_SUFFIX),_au)
 BOARD_PLATFORM_LIST += msmnile
 endif
 ifeq ($(TARGET_BOARD_SUFFIX),_gvmq)
+BOARD_PLATFORM_LIST += msmnile
+endif
+ifeq ($(TARGET_BOARD_DERIVATIVE_SUFFIX),_tb)
 BOARD_PLATFORM_LIST += msmnile
 endif
 

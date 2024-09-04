@@ -53,8 +53,6 @@ typedef uint32_t in_addr_t;
 #define MAX_STA_CLNT_IFACES 10
 #define STA_CLNT_SUBNET_MASK 0xFFFFFF00
 
-using namespace std;
-
 typedef struct _nat_entry_bundle
 {
 	struct nf_conntrack *ct;

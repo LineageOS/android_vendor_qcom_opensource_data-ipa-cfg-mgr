@@ -57,8 +57,6 @@ extern "C"
 #include <sys/inotify.h>
 }
 
-using namespace std;
-
 #define UDP_TIMEOUT_UPDATE 20
 #define BROADCAST_IPV4_ADDR 0xFFFFFFFF
 

@@ -125,7 +125,7 @@ IPACM_LanToLan* IPACM_LanToLan::get_instance()
 #ifdef FEATURE_L2TP
 bool IPACM_LanToLan::has_l2tp_iface()
 {
-	list<IPACM_LanToLan_Iface>::iterator it;
+	std::list<IPACM_LanToLan_Iface>::iterator it;
 	bool has_l2tp_iface = false;
 
 	for(it = m_iface.begin(); it != m_iface.end(); it++)
@@ -239,8 +239,8 @@ void IPACM_LanToLan::event_callback(ipa_cm_event_id event, void* param)
 
 void IPACM_LanToLan::handle_iface_up(ipacm_event_eth_bridge *data)
 {
-	list<IPACM_LanToLan_Iface>::iterator it;
-	list<l2tp_vlan_mapping_info>::iterator it_mapping;
+	std::list<IPACM_LanToLan_Iface>::iterator it;
+	std::list<l2tp_vlan_mapping_info>::iterator it_mapping;
 #ifdef FEATURE_L2TP
 	bool has_l2tp_iface = false;
 #endif
@@ -352,7 +352,7 @@ void IPACM_LanToLan::handle_iface_up(ipacm_event_eth_bridge *data)
 
 void IPACM_LanToLan::handle_iface_down(ipacm_event_eth_bridge *data)
 {
-	list<IPACM_LanToLan_Iface>::iterator it_target_iface;
+	std::list<IPACM_LanToLan_Iface>::iterator it_target_iface;
 #ifdef FEATURE_L2TP
 	bool has_l2tp_iface = false;
 #endif
@@ -442,8 +442,8 @@ void IPACM_LanToLan::handle_new_iface_up(IPACM_LanToLan_Iface *new_iface, IPACM_
 
 void IPACM_LanToLan::handle_client_add(ipacm_event_eth_bridge *data)
 {
-	list<IPACM_LanToLan_Iface>::iterator it_iface;
-	list<l2tp_vlan_mapping_info>::iterator it_mapping;
+	std::list<IPACM_LanToLan_Iface>::iterator it_iface;
+	std::list<l2tp_vlan_mapping_info>::iterator it_mapping;
 	l2tp_vlan_mapping_info *mapping_info = NULL;
 	bool is_l2tp_client = false;
 
@@ -495,7 +495,7 @@ void IPACM_LanToLan::handle_client_add(ipacm_event_eth_bridge *data)
 
 void IPACM_LanToLan::handle_client_del(ipacm_event_eth_bridge *data)
 {
-	list<IPACM_LanToLan_Iface>::iterator it_iface;
+	std::list<IPACM_LanToLan_Iface>::iterator it_iface;
 
 	IPACMDBG_H("Incoming client MAC: 0x%02x%02x%02x%02x%02x%02x, interface: %s\n", data->mac_addr[0], data->mac_addr[1],
 		data->mac_addr[2], data->mac_addr[3], data->mac_addr[4], data->mac_addr[5], data->p_iface->dev_name);
@@ -520,7 +520,7 @@ void IPACM_LanToLan::handle_client_del(ipacm_event_eth_bridge *data)
 
 void IPACM_LanToLan::handle_wlan_scc_mcc_switch(ipacm_event_eth_bridge *data)
 {
-	list<IPACM_LanToLan_Iface>::iterator it_iface;
+	std::list<IPACM_LanToLan_Iface>::iterator it_iface;
 
 	IPACMDBG_H("Incoming interface: %s\n", data->p_iface->dev_name);
 	for(it_iface = m_iface.begin(); it_iface != m_iface.end(); it_iface++)
@@ -537,8 +537,8 @@ void IPACM_LanToLan::handle_wlan_scc_mcc_switch(ipacm_event_eth_bridge *data)
 #ifdef FEATURE_L2TP
 void IPACM_LanToLan::handle_add_vlan_iface(ipa_ioc_vlan_iface_info *data)
 {
-	list<vlan_iface_info>::iterator it_vlan;
-	list<l2tp_vlan_mapping_info>::iterator it_mapping;
+	std::list<vlan_iface_info>::iterator it_vlan;
+	std::list<l2tp_vlan_mapping_info>::iterator it_mapping;
 	vlan_iface_info new_vlan_info;
 
 	IPACMDBG_H("Vlan iface: %s vlan id: %d\n", data->name, data->vlan_id);
@@ -569,8 +569,8 @@ void IPACM_LanToLan::handle_add_vlan_iface(ipa_ioc_vlan_iface_info *data)
 
 void IPACM_LanToLan::handle_del_vlan_iface(ipa_ioc_vlan_iface_info *data)
 {
-	list<vlan_iface_info>::iterator it_vlan;
-	list<l2tp_vlan_mapping_info>::iterator it_mapping;
+	std::list<vlan_iface_info>::iterator it_vlan;
+	std::list<l2tp_vlan_mapping_info>::iterator it_mapping;
 
 	IPACMDBG_H("Vlan iface: %s vlan id: %d\n", data->name, data->vlan_id);
 	for(it_vlan = m_vlan_iface.begin(); it_vlan != m_vlan_iface.end(); it_vlan++)
@@ -600,9 +600,9 @@ void IPACM_LanToLan::handle_del_vlan_iface(ipa_ioc_vlan_iface_info *data)
 }
 void IPACM_LanToLan::handle_add_l2tp_vlan_mapping(ipa_ioc_l2tp_vlan_mapping_info *data)
 {
-	list<l2tp_vlan_mapping_info>::iterator it_mapping;
-	list<vlan_iface_info>::iterator it_vlan;
-	list<IPACM_LanToLan_Iface>::iterator it_iface;
+	std::list<l2tp_vlan_mapping_info>::iterator it_mapping;
+	std::list<vlan_iface_info>::iterator it_vlan;
+	std::list<IPACM_LanToLan_Iface>::iterator it_iface;
 	IPACM_LanToLan_Iface *l2tp_iface;
 	l2tp_vlan_mapping_info new_mapping;
 	bool has_l2tp_iface = false;
@@ -670,8 +670,8 @@ void IPACM_LanToLan::handle_add_l2tp_vlan_mapping(ipa_ioc_l2tp_vlan_mapping_info
 
 void IPACM_LanToLan::handle_del_l2tp_vlan_mapping(ipa_ioc_l2tp_vlan_mapping_info *data)
 {
-	list<l2tp_vlan_mapping_info>::iterator it;
-	list<IPACM_LanToLan_Iface>::iterator it_iface;
+	std::list<l2tp_vlan_mapping_info>::iterator it;
+	std::list<IPACM_LanToLan_Iface>::iterator it_iface;
 
 	IPACMDBG_H("L2tp iface: %s session id: %d vlan iface: %s \n",
 		data->l2tp_iface_name, data->l2tp_session_id, data->vlan_iface_name);
@@ -697,8 +697,8 @@ void IPACM_LanToLan::handle_del_l2tp_vlan_mapping(ipa_ioc_l2tp_vlan_mapping_info
 }
 void IPACM_LanToLan::handle_vlan_client_info(ipacm_event_data_all *data)
 {
-	list<l2tp_vlan_mapping_info>::iterator it_mapping;
-	list<vlan_iface_info>::iterator it_vlan;
+	std::list<l2tp_vlan_mapping_info>::iterator it_mapping;
+	std::list<vlan_iface_info>::iterator it_vlan;
 
 	IPACMDBG_H("Incoming vlan client iface: %s IPv6 address: 0x%08x%08x%08x%08x\n", data->iface_name,
 		data->ipv6_addr[0], data->ipv6_addr[1], data->ipv6_addr[2], data->ipv6_addr[3]);
@@ -736,8 +736,8 @@ void IPACM_LanToLan::handle_vlan_client_info(ipacm_event_data_all *data)
 
 void IPACM_LanToLan::handle_vlan_iface_info(ipacm_event_data_all *data)
 {
-	list<vlan_iface_info>::iterator it_vlan;
-	list<l2tp_vlan_mapping_info>::iterator it_mapping;
+	std::list<vlan_iface_info>::iterator it_vlan;
+	std::list<l2tp_vlan_mapping_info>::iterator it_mapping;
 
 	IPACMDBG_H("Incoming vlan iface: %s IPv6 address: 0x%08x%08x%08x%08x\n", data->iface_name,
 		data->ipv6_addr[0], data->ipv6_addr[1], data->ipv6_addr[2], data->ipv6_addr[3]);
@@ -775,7 +775,7 @@ void IPACM_LanToLan::handle_vlan_iface_info(ipacm_event_data_all *data)
 
 void IPACM_LanToLan::handle_cached_client_add_event(IPACM_Lan *p_iface)
 {
-	list<ipacm_event_eth_bridge>::iterator it;
+	std::list<ipacm_event_eth_bridge>::iterator it;
 
 	it = m_cached_client_add_event.begin();
 	while(it != m_cached_client_add_event.end())
@@ -797,7 +797,7 @@ void IPACM_LanToLan::handle_cached_client_add_event(IPACM_Lan *p_iface)
 
 void IPACM_LanToLan::clear_cached_client_add_event(IPACM_Lan *p_iface)
 {
-	list<ipacm_event_eth_bridge>::iterator it;
+	std::list<ipacm_event_eth_bridge>::iterator it;
 
 	it = m_cached_client_add_event.begin();
 	while(it != m_cached_client_add_event.end())
@@ -818,10 +818,10 @@ void IPACM_LanToLan::clear_cached_client_add_event(IPACM_Lan *p_iface)
 
 void IPACM_LanToLan::print_data_structure_info()
 {
-	list<IPACM_LanToLan_Iface>::iterator it;
-	list<ipacm_event_eth_bridge>::iterator it_event;
-	list<vlan_iface_info>::iterator it_vlan;
-	list<l2tp_vlan_mapping_info>::iterator it_mapping;
+	std::list<IPACM_LanToLan_Iface>::iterator it;
+	std::list<ipacm_event_eth_bridge>::iterator it_event;
+	std::list<vlan_iface_info>::iterator it_vlan;
+	std::list<l2tp_vlan_mapping_info>::iterator it_mapping;
 	int i;
 
 	IPACMDBG_H("Is there l2tp interface? %d\n", m_has_l2tp_iface);
@@ -877,7 +877,7 @@ void IPACM_LanToLan::print_data_structure_info()
 
 void IPACM_LanToLan_Iface::add_client_rt_rule_for_new_iface()
 {
-	list<client_info>::iterator it;
+	std::list<client_info>::iterator it;
 	ipa_hdr_l2_type peer_l2_type;
 	peer_iface_info &peer = m_peer_iface_info.front();
 
@@ -1004,8 +1004,8 @@ void IPACM_LanToLan_Iface::add_l2tp_client_rt_rule(peer_iface_info *peer, client
 
 void IPACM_LanToLan_Iface::add_all_inter_interface_client_flt_rule(ipa_ip_type iptype)
 {
-	list<peer_iface_info>::iterator it_iface;
-	list<client_info>::iterator it_client;
+	std::list<peer_iface_info>::iterator it_iface;
+	std::list<client_info>::iterator it_client;
 
 	for(it_iface = m_peer_iface_info.begin(); it_iface != m_peer_iface_info.end(); it_iface++)
 	{
@@ -1020,7 +1020,7 @@ void IPACM_LanToLan_Iface::add_all_inter_interface_client_flt_rule(ipa_ip_type i
 
 void IPACM_LanToLan_Iface::add_all_intra_interface_client_flt_rule(ipa_ip_type iptype)
 {
-	list<client_info>::iterator it_client;
+	std::list<client_info>::iterator it_client;
 
 	IPACMDBG_H("Add flt rules for own clients.\n");
 	for(it_client = m_client_info.begin(); it_client != m_client_info.end(); it_client++)
@@ -1033,7 +1033,7 @@ void IPACM_LanToLan_Iface::add_all_intra_interface_client_flt_rule(ipa_ip_type i
 
 void IPACM_LanToLan_Iface::add_one_client_flt_rule(IPACM_LanToLan_Iface *peer_iface, client_info *client)
 {
-	list<peer_iface_info>::iterator it;
+	std::list<peer_iface_info>::iterator it;
 
 	for(it = m_peer_iface_info.begin(); it != m_peer_iface_info.end(); it++)
 	{
@@ -1057,7 +1057,7 @@ void IPACM_LanToLan_Iface::add_one_client_flt_rule(IPACM_LanToLan_Iface *peer_if
 
 void IPACM_LanToLan_Iface::add_client_flt_rule(peer_iface_info *peer, client_info *client, ipa_ip_type iptype)
 {
-	list<flt_rule_info>::iterator it_flt;
+	std::list<flt_rule_info>::iterator it_flt;
 	uint32_t flt_rule_hdl;
 	uint32_t l2tp_first_pass_flt_rule_hdl = 0, l2tp_second_pass_flt_rule_hdl = 0;
 	flt_rule_info new_flt_info;
@@ -1140,7 +1140,7 @@ void IPACM_LanToLan_Iface::add_client_flt_rule(peer_iface_info *peer, client_inf
 
 void IPACM_LanToLan_Iface::del_one_client_flt_rule(IPACM_LanToLan_Iface *peer_iface, client_info *client)
 {
-	list<peer_iface_info>::iterator it;
+	std::list<peer_iface_info>::iterator it;
 
 	for(it = m_peer_iface_info.begin(); it != m_peer_iface_info.end(); it++)
 	{
@@ -1156,7 +1156,7 @@ void IPACM_LanToLan_Iface::del_one_client_flt_rule(IPACM_LanToLan_Iface *peer_if
 
 void IPACM_LanToLan_Iface::del_client_flt_rule(peer_iface_info *peer, client_info *client)
 {
-	list<flt_rule_info>::iterator it_flt;
+	std::list<flt_rule_info>::iterator it_flt;
 
 	for(it_flt = peer->flt_rule.begin(); it_flt != peer->flt_rule.end(); it_flt++)
 	{
@@ -1297,8 +1297,8 @@ void IPACM_LanToLan_Iface::del_client_rt_rule(peer_iface_info *peer, client_info
 
 void IPACM_LanToLan_Iface::handle_down_event()
 {
-	list<IPACM_LanToLan_Iface>::iterator it_other_iface;
-	list<peer_iface_info>::iterator it_own_peer_info, it_other_iface_peer_info;
+	std::list<IPACM_LanToLan_Iface>::iterator it_other_iface;
+	std::list<peer_iface_info>::iterator it_own_peer_info, it_other_iface_peer_info;
 	IPACM_LanToLan_Iface *other_iface;
 
 	/* clear inter-interface rules */
@@ -1369,7 +1369,7 @@ void IPACM_LanToLan_Iface::handle_down_event()
 
 void IPACM_LanToLan_Iface::clear_all_flt_rule_for_one_peer_iface(peer_iface_info *peer)
 {
-	list<flt_rule_info>::iterator it;
+	std::list<flt_rule_info>::iterator it;
 
 	for(it = peer->flt_rule.begin(); it != peer->flt_rule.end(); it++)
 	{
@@ -1432,7 +1432,7 @@ void IPACM_LanToLan_Iface::clear_all_flt_rule_for_one_peer_iface(peer_iface_info
 
 void IPACM_LanToLan_Iface::clear_all_rt_rule_for_one_peer_iface(peer_iface_info *peer)
 {
-	list<client_info>::iterator it;
+	std::list<client_info>::iterator it;
 	ipa_hdr_l2_type peer_l2_type;
 
 	peer_l2_type = peer->peer->get_iface_pointer()->tx_prop->tx[0].hdr_l2_type;
@@ -1456,8 +1456,8 @@ void IPACM_LanToLan_Iface::clear_all_rt_rule_for_one_peer_iface(peer_iface_info 
 
 void IPACM_LanToLan_Iface::handle_wlan_scc_mcc_switch()
 {
-	list<peer_iface_info>::iterator it_peer_info;
-	list<client_info>::iterator it_client;
+	std::list<peer_iface_info>::iterator it_peer_info;
+	std::list<client_info>::iterator it_client;
 	ipa_hdr_l2_type peer_l2_hdr_type;
 	bool flag[IPA_HDR_L2_MAX];
 	int i;
@@ -1587,8 +1587,8 @@ void IPACM_LanToLan_Iface::handle_client_add(uint8_t *mac,
 	l2tp_vlan_mapping_info *mapping_info,
 	int ep)
 {
-	list<client_info>::iterator it_client;
-	list<peer_iface_info>::iterator it_peer_info;
+	std::list<client_info>::iterator it_client;
+	std::list<peer_iface_info>::iterator it_peer_info;
 	client_info new_client;
 	bool flag[IPA_HDR_L2_MAX];
 
@@ -1665,8 +1665,8 @@ void IPACM_LanToLan_Iface::handle_client_add(uint8_t *mac,
 
 void IPACM_LanToLan_Iface::handle_client_del(uint8_t *mac)
 {
-	list<client_info>::iterator it_client;
-	list<peer_iface_info>::iterator it_peer_info;
+	std::list<client_info>::iterator it_client;
+	std::list<peer_iface_info>::iterator it_peer_info;
 	bool flag[IPA_HDR_L2_MAX];
 
 	for(it_client = m_client_info.begin(); it_client != m_client_info.end(); it_client++)
@@ -1756,8 +1756,8 @@ void IPACM_LanToLan_Iface::del_hdr_proc_ctx(ipa_hdr_l2_type peer_l2_type)
 
 void IPACM_LanToLan_Iface::print_data_structure_info()
 {
-	list<peer_iface_info>::iterator it_peer;
-	list<client_info>::iterator it_client;
+	std::list<peer_iface_info>::iterator it_peer;
+	std::list<client_info>::iterator it_client;
 	int i, j, k;
 
 	IPACMDBG_H("\n");
@@ -1907,8 +1907,8 @@ void IPACM_LanToLan_Iface::print_data_structure_info()
 
 void IPACM_LanToLan_Iface::print_peer_info(peer_iface_info *peer_info)
 {
-	list<flt_rule_info>::iterator it_flt;
-	list<rt_rule_info>::iterator it_rt;
+	std::list<flt_rule_info>::iterator it_flt;
+	std::list<rt_rule_info>::iterator it_rt;
 
 	IPACMDBG_H("Printing peer info for iface %s:\n", peer_info->peer->m_p_iface->dev_name);
 
@@ -2007,8 +2007,8 @@ bool IPACM_LanToLan_Iface::is_l2tp_iface()
 
 void IPACM_LanToLan_Iface::switch_to_l2tp_iface()
 {
-	list<peer_iface_info>::iterator it_peer;
-	list<flt_rule_info>::iterator it_flt;
+	std::list<peer_iface_info>::iterator it_peer;
+	std::list<flt_rule_info>::iterator it_flt;
 
 	for(it_peer = m_peer_iface_info.begin(); it_peer != m_peer_iface_info.end(); it_peer++)
 	{
@@ -2033,8 +2033,8 @@ void IPACM_LanToLan_Iface::handle_l2tp_enable()
 {
 	int i;
 	ipa_hdr_l2_type peer_l2_hdr_type;
-	list<peer_iface_info>::iterator it_peer_info;
-	list<client_info>::iterator it_client;
+	std::list<peer_iface_info>::iterator it_peer_info;
+	std::list<client_info>::iterator it_client;
 	bool flag[IPA_HDR_L2_MAX];
 
 	if(m_support_inter_iface_offload)
@@ -2070,8 +2070,8 @@ void IPACM_LanToLan_Iface::handle_l2tp_disable()
 {
 	int i;
 	ipa_hdr_l2_type peer_l2_hdr_type;
-	list<peer_iface_info>::iterator it_peer_info;
-	list<client_info>::iterator it_client;
+	std::list<peer_iface_info>::iterator it_peer_info;
+	std::list<client_info>::iterator it_client;
 	bool flag[IPA_HDR_L2_MAX];
 
 	if(m_support_inter_iface_offload)

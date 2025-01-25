@@ -1,10 +1,9 @@
-
 cc_binary {
     name: "ipacm",
 
     local_include_dirs: ["src"] + ["inc"],
     header_libs: ["device_kernel_headers"]+["qti_kernel_headers",
-	"libutils_headers", "libcutils_headers"]+["qti_ipa_kernel_headers"],
+	"libutils_headers", "libcutils_headers"],
 
     cflags: ["-DFEATURE_IPA_ANDROID"] + ["-DFEATURE_IPACM_RESTART"] + [
         "-DFEATURE_IPACM_AIDL",
@@ -84,7 +83,7 @@ cc_fuzz {
 
     local_include_dirs: ["src"] + ["inc"],
     header_libs: ["device_kernel_headers"]+["qti_kernel_headers",
-	"libutils_headers", "libcutils_headers"]+["qti_ipa_kernel_headers"],
+	"libutils_headers", "libcutils_headers"],
 
     cflags: ["-v"] + ["-DFEATURE_IPA_ANDROID"] + ["-DFEATURE_IPACM_RESTART"] + [
         "-DFEATURE_IPACM_AIDL",

@@ -25,6 +25,10 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * All rights reserved.
+ * Confidential and Proprietary - Qualcomm Technologies, Inc.
  */
 #define LOG_TAG "IPAHALService/dump"
 
@@ -117,10 +121,10 @@ LocalLogBuffer::LocalLogBuffer(string name, int maxLogs) : mName(name),
 void LocalLogBuffer::addLog(FunctionLog log) {
     while (mLogs.size() > mMaxLogs)
         mLogs.pop_front();
-    mLogs.push_back(log);
+    mLogs.push_back(log.toString());
 } /* addLog */
 
 void LocalLogBuffer::toLogcat() {
     for (size_t i = 0; i < mLogs.size(); i++)
-        ALOGD("%s: %s", mName.c_str(), mLogs[i].toString().c_str());
+        ALOGD("%s: %s", mName.c_str(), mLogs[i].c_str());
 } /* toLogcat */

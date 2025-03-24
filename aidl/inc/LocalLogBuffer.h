@@ -25,6 +25,10 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * All rights reserved.
+ * Confidential and Proprietary - Qualcomm Technologies, Inc.
  */
 #ifndef _LOCAL_LOG_BUFFER_H_
 #define _LOCAL_LOG_BUFFER_H_
@@ -66,7 +70,7 @@ public:
     void addLog(FunctionLog /* log */);
     void toLogcat();
 private:
-    deque<FunctionLog> mLogs;
+    deque<string> mLogs;
     const string mName;
     const size_t mMaxLogs;
 }; /* LocalLogBuffer */

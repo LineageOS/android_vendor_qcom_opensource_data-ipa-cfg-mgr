@@ -360,6 +360,22 @@ int IPACM_ConntrackClient::IPA_Conntrack_TCP_Filter_Init(void)
 	nfct_filter_add_attr(pClient->tcp_filter,
 											 NFCT_FILTER_L4PROTO_STATE,
 											 &tcp_proto_state);
+
+	tcp_proto_state.proto = IPPROTO_TCP;
+	tcp_proto_state.state = TCP_CONNTRACK_CLOSE;
+	ret = nfct_filter_set_logic(pClient->tcp_filter,
+															NFCT_FILTER_L4PROTO_STATE,
+															NFCT_FILTER_LOGIC_POSITIVE);
+	if(ret == -1)
+	{
+		IPACMERR("unable to set filter logic\n");
+		return -1;
+	}
+
+	nfct_filter_add_attr(pClient->tcp_filter,
+											 NFCT_FILTER_L4PROTO_STATE,
+											 &tcp_proto_state);
+
 	return 0;
 }
 

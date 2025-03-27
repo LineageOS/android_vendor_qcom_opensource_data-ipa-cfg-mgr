@@ -1328,7 +1328,7 @@ void NatApp::CacheEntry(const nat_table_entry *rule)
 void NatApp::Read_TcpUdp_Timeout(void) {
 #ifdef FEATURE_IPACM_HAL
 	tcp_timeout = 432000;
-	udp_timeout = 180;
+	udp_timeout = 120;
 	IPACMDBG_H("udp timeout value: %d\n", udp_timeout);
 	IPACMDBG_H("tcp timeout value: %d\n", tcp_timeout);
 #else

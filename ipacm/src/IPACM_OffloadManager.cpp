@@ -25,6 +25,12 @@ BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
 WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
 OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
 IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.Z
+
+Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+
+Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+
+SPDX-License-Identifier: BSD-3-Clause-Clear
 */
 /*!
   @file
@@ -156,10 +162,18 @@ RET IPACM_OffloadManager::provideFd(int fd, unsigned int groups)
 			IPACMERR( "setsockopt returned error code %d ( %s )", errno, strerror( errno ) );
 		}
 	} else if (groups == cc->subscrips_udp) {
+		cc->fd_udp = dup(fd);
+		IPACMDBG_H("Received fd %d with groups %d.\n", fd, groups);
+		/* set netlink buf */
+		rel = setsockopt(cc->fd_udp, SOL_NETLINK, NETLINK_NO_ENOBUFS, &on, sizeof(int) );
+		if (rel == -1)
+		{
+			IPACMERR("setsockopt returned error code %d ( %s )\n", errno, strerror(errno));
+		}
 		/* Set receive timeout to 1s on the FD which is used to read conntrack dump. */
 		memset(&tv,0, sizeof(struct timeval));
 		tv.tv_sec = 1; /* 1s timeout */
-		rel = setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO,(struct timeval *)&tv,sizeof(struct timeval));
+		rel = setsockopt(cc->fd_udp, SOL_SOCKET, SO_RCVTIMEO,(struct timeval *)&tv,sizeof(struct timeval));
 		if (rel == -1)
 		{
 			IPACMERR("setsockopt returned error code %d ( %s )\n", errno, strerror(errno));
@@ -173,19 +187,10 @@ RET IPACM_OffloadManager::provideFd(int fd, unsigned int groups)
 		   reading ct entries before creating filter on Fd in order to have NAT entries
 		   for both TCP/UDP embedded traffic.
 		*/
-		CtList->readConntrack(fd);
+		CtList->readConntrack(cc->fd_udp);
 		/* Reset receive timeout on the FD which is used to read conntrack dump. */
 		memset(&tv,0, sizeof(struct timeval));
-		rel = setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO,(struct timeval *)&tv,sizeof(struct timeval));
-		if (rel == -1)
-		{
-			IPACMERR("setsockopt returned error code %d ( %s )\n", errno, strerror(errno));
-		}
-
-		cc->fd_udp = dup(fd);
-		IPACMDBG_H("Received fd %d with groups %d.\n", fd, groups);
-		/* set netlink buf */
-		rel = setsockopt(cc->fd_udp, SOL_NETLINK, NETLINK_NO_ENOBUFS, &on, sizeof(int) );
+		rel = setsockopt(cc->fd_udp, SOL_SOCKET, SO_RCVTIMEO,(struct timeval *)&tv,sizeof(struct timeval));
 		if (rel == -1)
 		{
 			IPACMERR("setsockopt returned error code %d ( %s )\n", errno, strerror(errno));

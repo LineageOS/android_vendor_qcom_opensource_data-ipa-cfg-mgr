@@ -22,7 +22,7 @@ BOARD_IPA_LOW_RAM_EXCP_LIST := bengal
 BOARD_IPA_LOW_RAM_EXCP_LIST += monaco
 
 ifeq ($(TARGET_HAS_LOW_RAM),true)
-ifneq ($(call is-board-platform-in-list,$(BOARD_IPA_LOW_RAM_EXCP_LIST)),true)
+ifneq (, $(call is-board-platform-in-list2,$(BOARD_IPA_LOW_RAM_EXCP_LIST)))
 	TARGET_DISABLE_IPACM := true
 endif
 endif
@@ -56,7 +56,7 @@ BOARD_IPAv3_LIST += bengal
 BOARD_ETH_BRIDGE_LIST := msmnile
 BOARD_ETH_BRIDGE_LIST += kona
 
-ifneq ($(call is-board-platform-in-list,$(BOARD_PLATFORM_LIST)),true)
+ifeq (, $(call is-board-platform-in-list2,$(BOARD_PLATFORM_LIST)))
 ifneq (,$(filter $(QCOM_BOARD_PLATFORMS),$(TARGET_BOARD_PLATFORM)))
 
 PRODUCT_PACKAGES += $(IPACM_DATA)

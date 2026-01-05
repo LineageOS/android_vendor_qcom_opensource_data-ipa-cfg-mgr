@@ -282,7 +282,7 @@ void IPACM_LanToLan::handle_iface_up(ipacm_event_eth_bridge *data)
 			return;
 		}
 
-		if(data->p_iface->tx_prop->tx[0].hdr_l2_type == IPA_HDR_L2_NONE || data->p_iface->tx_prop->tx[0].hdr_l2_type == IPA_HDR_L2_MAX)
+		if(data->p_iface->tx_prop->tx[0].hdr_l2_type == IPA_HDR_L2_NONE || (int)data->p_iface->tx_prop->tx[0].hdr_l2_type == IPA_HDR_L2_MAX)
 		{
 			IPACMERR("Invalid l2 header type %s!\n", ipa_l2_hdr_type[data->p_iface->tx_prop->tx[0].hdr_l2_type]);
 			return;

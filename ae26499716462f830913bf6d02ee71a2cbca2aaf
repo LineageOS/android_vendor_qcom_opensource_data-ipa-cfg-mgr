@@ -16,6 +16,24 @@
       "message": "Did you run bpfmt? It looks like a manual change because in the first file it\u0027s removing the first newline while the second file still keeps two.",
       "revId": "ae26499716462f830913bf6d02ee71a2cbca2aaf",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "5afe36dc_991a8e90",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 35494
+      },
+      "writtenOn": "2026-02-02T16:07:13Z",
+      "side": 1,
+      "message": "Actually I had run bpfix earlier and running bpfmt afterward didn’t change anything.",
+      "parentUuid": "1027d0cb_1228ac80",
+      "revId": "ae26499716462f830913bf6d02ee71a2cbca2aaf",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }

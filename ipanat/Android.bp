@@ -10,8 +10,8 @@ cc_library_shared {
         "src/ipa_nat_drvi.c",
     ],
 
-   shared_libs:
-        ["libcutils",
+    shared_libs: [
+        "libcutils",
         "libdl",
         "libbase",
         "libutils",

@@ -27,9 +27,9 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * ​​​​​Changes from Qualcomm Innovation Center are provided under the following license:
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
- * SPDX-License-Identifier: BSD-3-Clause-Clear
+Changes from Qualcomm Technologies, Inc. are provided under the following license:
+Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 #ifndef DBG
     #define DBG true
@@ -200,8 +200,8 @@ void AIDL::unregisterCtCb() {
 
 void AIDL::clearHandles() {
     ALOGI("clearHandles()");
-    mHandle1.release();
-    mHandle2.release();
+    mHandle1 = ndk::ScopedFileDescriptor();
+    mHandle2 = ndk::ScopedFileDescriptor();
 } /* clearHandles */
 
 bool AIDL::isInitialized() {

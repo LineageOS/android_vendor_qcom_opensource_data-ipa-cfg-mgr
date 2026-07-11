@@ -62,7 +62,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 */
 /*
  * ​​​​​Changes from Qualcomm Innovation Center are provided under the following license:
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 /*!
@@ -168,6 +168,7 @@ IPACM_Wan::IPACM_Wan(int iface_index,
 	header_partial_default_wan_v6 = false;
 	hdr_hdl_sta_v4 = 0;
 	hdr_hdl_sta_v6 = 0;
+	modem_ipv6_pdn_index = -1;
 	num_ipv6_dest_flt_rule = 0;
 	memset(ipv6_dest_flt_rule_hdl, 0, MAX_DEFAULT_v6_ROUTE_RULES*sizeof(uint32_t));
 	memset(ipv6_prefix, 0, sizeof(ipv6_prefix));
@@ -6555,7 +6556,7 @@ int IPACM_Wan::handle_down_evt_ex()
 	}
 	else if(ip_type == IPA_IP_v6)
 	{
-	    if (num_dft_rt_v6 > 1)
+		if (modem_ipv6_pdn_index != -1)
 			num_ipv6_modem_pdn--;
 		IPACMDBG_H("Now the number of ipv6 modem pdn is %d.\n", num_ipv6_modem_pdn);
 		/* only when default gw goes down we post WAN_DOWN event*/
@@ -6665,7 +6666,7 @@ int IPACM_Wan::handle_down_evt_ex()
 	{
 		num_ipv4_modem_pdn--;
 		IPACMDBG_H("Now the number of ipv4 modem pdn is %d.\n", num_ipv4_modem_pdn);
-	    if (num_dft_rt_v6 > 1)
+		if (modem_ipv6_pdn_index != -1)
 			num_ipv6_modem_pdn--;
 		IPACMDBG_H("Now the number of ipv6 modem pdn is %d.\n", num_ipv6_modem_pdn);
 		/* only when default gw goes down we post WAN_DOWN event*/
